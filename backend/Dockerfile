@@ -1,10 +1,10 @@
 FROM node:22-alpine AS base
 WORKDIR /usr/src/app
 
-COPY package*.json ./
+COPY backend/package*.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
 
-COPY src ./src
+COPY backend/src ./src
 
 ENV NODE_ENV=production
 USER node
