@@ -1,0 +1,64 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: [redis-server, --appendonly, 'yes']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+  api:
+    build:
+      context: ./backend
+      dockerfile: docker/Dockerfile
+    init: true
+    restart: unless-stopped
+    env_file: ./backend/.env
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      TRUST_PROXY: '1'
+      REDIS_URL: redis://redis:6379
+    ports: ['127.0.0.1:5000:5000']
+    depends_on:
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:5000/ready',{signal:AbortSignal.timeout(2000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+  worker:
+    build:
+      context: ./backend
+      dockerfile: docker/Dockerfile
+    init: true
+    restart: unless-stopped
+    env_file: ./backend/.env
+    environment:
+      NODE_ENV: production
+      REDIS_URL: redis://redis:6379
+    command: [node, src/jobs/worker.js]
+    depends_on:
+      api: { condition: service_healthy }
+      redis: { condition: service_healthy }
+  web:
+    build: ./frontend
+    init: true
+    restart: unless-stopped
+    environment:
+      INTERNAL_API_URL: http://api:5000/api/v1
+      PORT: 3000
+      HOST: 0.0.0.0
+    ports: ['127.0.0.1:3000:3000']
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/login',{signal:AbortSignal.timeout(5000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 7s
+      retries: 5
+volumes:
+  redis-data:

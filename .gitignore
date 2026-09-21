@@ -1,0 +1,36 @@
+# Dependencies, generated builds and test output
+node_modules/
+.output/
+dist/
+dist-ssr/
+coverage/
+test-results/
+playwright-report/
+.cache/
+.nitro/
+.tanstack/
+.vinxi/
+.wrangler/
+output/
+
+# Local credentials and environment overrides
+.env
+.env.*
+!.env.example
+# This file contains only the public API URL, reviewed before committing.
+!frontend/.env.production
+.dev.vars
+*.pem
+*.key
+*.p12
+*.pfx
+*.log
+*.local
+
+# Local editor / agent state
+.idea/
+.vscode/
+.agents/
+.codex/
+.DS_Store
+Thumbs.db

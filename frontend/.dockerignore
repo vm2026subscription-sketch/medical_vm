@@ -1,0 +1,12 @@
+node_modules
+.output
+.tanstack
+.wrangler
+test-results
+playwright-report
+tests
+.git
+.env
+.env.*
+!.env.production
+*.log
