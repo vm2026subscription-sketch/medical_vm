@@ -1,8 +1,8 @@
-FROM node:22-alpine AS base
+FROM node:24-alpine AS base
 WORKDIR /usr/src/app
 
 COPY backend/package*.json ./
-RUN npm ci --omit=dev --no-audit --no-fund
+RUN npm install --omit=dev --no-audit --no-fund
 
 COPY backend/src ./src
 
