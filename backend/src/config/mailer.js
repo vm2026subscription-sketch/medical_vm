@@ -11,15 +11,27 @@ let transporter;
  * has no IPv6 route, so the IPv6 attempt fails with ENETUNREACH before IPv4 is ever tried.
  * Nodemailer forwards no family/lookup option to the socket, so the address is resolved
  * here and the original hostname is preserved separately for TLS SNI verification.
+ *
+ * dns.lookup is tried first because it uses the OS resolver (getaddrinfo) and therefore
+ * ignores dns.setServers() from config/env. A DNS_SERVERS override can break the c-ares
+ * path (resolve4) when outbound UDP 53 is blocked, which would silently push us back to
+ * the hostname and reproduce the IPv6 failure.
  */
 async function resolveIPv4(host) {
   try {
-    const result = await dns.resolve4(host);
-    return result[0] || host;
+    const result = await dns.lookup(host, { family: 4, all: true });
+    if (result.length) return { address: result[0].address, via: 'lookup' };
   } catch (error) {
-    logger.warn({ host, err: error.message }, 'IPv4 lookup failed, falling back to hostname');
-    return host;
+    logger.warn({ host, err: error.message }, 'IPv4 dns.lookup failed');
   }
+  try {
+    const records = await dns.resolve4(host);
+    if (records.length) return { address: records[0], via: 'resolve4' };
+  } catch (error) {
+    logger.warn({ host, err: error.message }, 'IPv4 resolve4 failed');
+  }
+  logger.error({ host }, 'No IPv4 address found, falling back to hostname (SMTP may fail without IPv6 routing)');
+  return { address: host, via: 'hostname' };
 }
 
 /**
@@ -30,7 +42,7 @@ async function resolveIPv4(host) {
 async function getMailTransporter() {
   if (!transporter) {
     const host = env.SMTP_HOST;
-    const address = await resolveIPv4(host);
+    const { address, via } = await resolveIPv4(host);
     transporter = nodemailer.createTransport({
       host: address,
       // Keeps certificate/SNI validation bound to the real hostname while connecting by IP.
@@ -47,7 +59,7 @@ async function getMailTransporter() {
         pass: env.SMTP_PASS,
       },
     });
-    logger.info({ host, address }, 'SMTP transporter created');
+    logger.info({ host, address, via }, 'SMTP transporter created');
   }
   return transporter;
 }
