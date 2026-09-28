@@ -7,6 +7,10 @@ dotenv.config();
 const dnsServers = (process.env.DNS_SERVERS || '').split(',').map((server) => server.trim()).filter(Boolean);
 if (dnsServers.length) dns.setServers(dnsServers);
 
+// Hosts like smtp.gmail.com publish AAAA records, but Railway has no IPv6 route, so the
+// IPv6 attempt fails with ENETUNREACH before the IPv4 connection is ever tried.
+dns.setDefaultResultOrder('ipv4first');
+
 if (process.env.NODE_ENV === 'production') {
   for (const key of ['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET']) {
     if (!process.env[key] || process.env[key].length < 32 || /change.me|dev-.*secret/i.test(process.env[key])) {
