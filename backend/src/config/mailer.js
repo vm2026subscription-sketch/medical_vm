@@ -17,9 +17,9 @@ function getMailTransporter() {
       port: env.SMTP_PORT,
       secure: env.SMTP_PORT === 465, // true for port 465 (SSL), false for 587 (STARTTLS)
       requireTLS: env.SMTP_PORT !== 465,
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 15000,
+      connectionTimeout: 30000,
+      greetingTimeout: 30000,
+      socketTimeout: 30000,
       auth: {
         user: env.SMTP_USER,
         pass: env.SMTP_PASS,
