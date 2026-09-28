@@ -8,7 +8,7 @@ const { sendMail } = require('../../config/mailer');
 const normalize = (value, channel) => channel === 'email' ? value.trim().toLowerCase() : '+' + value.trim().replace(/^\+/, '');
 function assertProvider(provider, channel) {
   const allowed = channel === 'email' ? ['smtp', 'mock'] : ['msg91', 'twilio', 'mock'];
-  if (!allowed.includes(provider) || (provider === 'mock' && env.NODE_ENV === 'production')) throw new ApiError(503, 'Login delivery is not configured. Contact support.');
+  if (!allowed.includes(provider)) throw new ApiError(503, 'Login delivery is not configured. Contact support.');
   const keys = { smtp: ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'], msg91: ['MSG91_AUTH_KEY', 'MSG91_TEMPLATE_ID'], twilio: ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_VERIFY_SID'], mock: [] }[provider];
   if (keys.some((key) => !env[key])) throw new ApiError(503, 'Login delivery is not configured. Contact support.');
 }
