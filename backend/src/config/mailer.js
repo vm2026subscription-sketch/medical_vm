@@ -69,9 +69,54 @@ function resetMailTransporter() {
   transporter = undefined;
 }
 
+function senderName() {
+  return env.MAIL_FROM_NAME || brand.fullName;
+}
+
+/**
+ * Railway blocks outbound SMTP (port 587 times out), so HTTP mail APIs are the reliable
+ * option in production. These travel over port 443, which is always allowed.
+ */
+async function sendViaResend({ to, subject, html, text }) {
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    signal: AbortSignal.timeout(15000),
+    headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: env.RESEND_FROM || env.SMTP_FROM, to: [to], subject, html, text }),
+  });
+  if (!res.ok) throw new Error(`Resend ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  return true;
+}
+
+async function sendViaBrevo({ to, subject, html, text }) {
+  const [name, address] = splitSender(env.BREVO_FROM || env.SMTP_FROM);
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    signal: AbortSignal.timeout(15000),
+    headers: { 'api-key': env.BREVO_API_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sender: { name, email: address }, to: [{ email: to }], subject, htmlContent: html, textContent: text }),
+  });
+  if (!res.ok) throw new Error(`Brevo ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  return true;
+}
+
+/** Splits a "Display Name <addr@example.com>" string into its parts. */
+function splitSender(value) {
+  const match = /^\s*(.*?)\s*<([^>]+)>\s*$/.exec(value || '');
+  return match ? [match[1] || senderName(), match[2]] : [senderName(), value || env.SMTP_USER];
+}
+
 async function sendMail({ to, subject, html, text }) {
-    const transport = await getMailTransporter();
+    const provider = env.EMAIL_OTP_PROVIDER;
     try {
+      if (provider === 'resend' || provider === 'brevo') {
+        logger.info({ to, provider }, 'Sending email via HTTP mail API');
+        if (provider === 'resend') await sendViaResend({ to, subject, html, text });
+        else await sendViaBrevo({ to, subject, html, text });
+        logger.info({ to, provider }, 'Email sent successfully');
+        return true;
+      }
+      const transport = await getMailTransporter();
       logger.info({ to, host: env.SMTP_HOST, port: env.SMTP_PORT }, 'Sending email via SMTP');
       await transport.sendMail({
         from: env.SMTP_FROM || { name: brand.fullName, address: env.SMTP_USER },
@@ -85,7 +130,7 @@ async function sendMail({ to, subject, html, text }) {
     } catch (err) {
       // A cached IP can go stale, so drop the transporter and let the next call re-resolve.
       resetMailTransporter();
-      logger.error({ err: { message: err.message, code: err.code, response: err.response, responseCode: err.responseCode }, to }, 'Failed to send email');
+      logger.error({ err: { message: err.message, code: err.code, response: err.response, responseCode: err.responseCode }, to, provider }, 'Failed to send email');
       return false;
     }
   }

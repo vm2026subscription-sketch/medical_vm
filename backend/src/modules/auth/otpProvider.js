@@ -7,9 +7,9 @@ const ApiError = require('../../utils/ApiError');
 const { sendMail } = require('../../config/mailer');
 const normalize = (value, channel) => channel === 'email' ? value.trim().toLowerCase() : '+' + value.trim().replace(/^\+/, '');
 function assertProvider(provider, channel) {
-  const allowed = channel === 'email' ? ['smtp', 'mock'] : ['msg91', 'twilio', 'mock'];
+  const allowed = channel === 'email' ? ['smtp', 'resend', 'brevo', 'mock'] : ['msg91', 'twilio', 'mock'];
   if (!allowed.includes(provider)) throw new ApiError(503, 'Login delivery is not configured. Contact support.');
-  const keys = { smtp: ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'], msg91: ['MSG91_AUTH_KEY', 'MSG91_TEMPLATE_ID'], twilio: ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_VERIFY_SID'], mock: [] }[provider];
+  const keys = { smtp: ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'], resend: ['RESEND_API_KEY'], brevo: ['BREVO_API_KEY'], msg91: ['MSG91_AUTH_KEY', 'MSG91_TEMPLATE_ID'], twilio: ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_VERIFY_SID'], mock: [] }[provider];
   if (keys.some((key) => !env[key])) throw new ApiError(503, 'Login delivery is not configured. Contact support.');
 }
 async function twilio(endpoint, values) {

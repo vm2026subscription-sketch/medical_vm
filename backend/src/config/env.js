@@ -56,14 +56,22 @@ module.exports = {
   TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN || '',
   TWILIO_VERIFY_SID: process.env.TWILIO_VERIFY_SID || '',
 
-  // Email OTP — 'mock' logs the code instead of sending mail, 'smtp' sends a real email
-  // via the SMTP_* settings below (works with Gmail App Passwords, Brevo, SendGrid, etc.)
-  EMAIL_OTP_PROVIDER: process.env.EMAIL_OTP_PROVIDER || 'mock', // 'mock' | 'smtp'
+  // Email OTP — 'mock' logs the code instead of sending mail, 'smtp' sends via SMTP_*,
+  // 'resend'/'brevo' use their HTTP APIs (port 443 — required on hosts that block
+  // outbound SMTP, e.g. Railway times out on port 587).
+  EMAIL_OTP_PROVIDER: process.env.EMAIL_OTP_PROVIDER || 'mock', // 'mock' | 'smtp' | 'resend' | 'brevo'
   SMTP_HOST: process.env.SMTP_HOST || '',
   SMTP_PORT: parseInt(process.env.SMTP_PORT || '587', 10),
   SMTP_USER: process.env.SMTP_USER || '',
   SMTP_PASS: process.env.SMTP_PASS || '',
   SMTP_FROM: process.env.SMTP_FROM || '',
+
+  // HTTP mail providers (recommended for production hosting)
+  RESEND_API_KEY: process.env.RESEND_API_KEY || '',
+  RESEND_FROM: process.env.RESEND_FROM || '',
+  BREVO_API_KEY: process.env.BREVO_API_KEY || '',
+  BREVO_FROM: process.env.BREVO_FROM || '',
+  MAIL_FROM_NAME: process.env.MAIL_FROM_NAME || '',
 
   // Cloudinary — for college images / avatars uploaded from the admin panel
   CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || '',
