@@ -30,20 +30,22 @@ function getMailTransporter() {
 }
 
 async function sendMail({ to, subject, html, text }) {
-  const transport = getMailTransporter();
-  try {
-    await transport.sendMail({
-      from: env.SMTP_FROM || { name: brand.fullName, address: env.SMTP_USER },
-      to,
-      subject,
-      html,
-      text,
-    });
-    return true;
-  } catch (err) {
-    logger.error({ err, to }, 'Failed to send email');
-    return false;
+    const transport = getMailTransporter();
+    try {
+      logger.info({ to, host: env.SMTP_HOST, port: env.SMTP_PORT }, 'Sending email via SMTP');
+      await transport.sendMail({
+        from: env.SMTP_FROM || { name: brand.fullName, address: env.SMTP_USER },
+        to,
+        subject,
+        html,
+        text,
+      });
+      logger.info({ to }, 'Email sent successfully');
+      return true;
+    } catch (err) {
+      logger.error({ err: { message: err.message, code: err.code, response: err.response, responseCode: err.responseCode }, to }, 'Failed to send email');
+      return false;
+    }
   }
-}
 
 module.exports = { getMailTransporter, sendMail };
