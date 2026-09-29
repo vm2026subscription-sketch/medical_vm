@@ -25,6 +25,18 @@ app.use(
 );
 app.use(pinoHttp({ logger }));
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+app.get('/health/email', (_req, res) => {
+  const { resolveProvider } = require('./config/mailer');
+  res.json({
+    provider: resolveProvider(),
+    configuredPreference: env.EMAIL_OTP_PROVIDER,
+    brevoKeyPresent: Boolean(env.BREVO_API_KEY),
+    brevoFrom: env.BREVO_FROM || null,
+    smtpConfigured: Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS),
+    smtpFrom: env.SMTP_FROM || null,
+    appUrl: env.APP_URL,
+  });
+});
 app.get('/ready', (_req, res) => {
   const ready = require('mongoose').connection.readyState === 1;
   res.status(ready ? 200 : 503).json({ status: ready ? 'ready' : 'unavailable' });
