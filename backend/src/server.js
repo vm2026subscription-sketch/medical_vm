@@ -3,9 +3,21 @@ const connectDB = require('./config/db');
 const env = require('./config/env');
 const logger = require('./utils/logger');
 const brand = require('./config/brand');
+const { resolveProvider } = require('./config/mailer');
 
 async function main() {
   await connectDB();
+
+  logger.info(
+    {
+      emailProvider: resolveProvider(),
+      configuredPreference: env.EMAIL_OTP_PROVIDER,
+      brevoKey: Boolean(env.BREVO_API_KEY),
+      resendKey: Boolean(env.RESEND_API_KEY),
+      smtpConfigured: Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS),
+    },
+    'Email OTP provider resolved'
+  );
 
   const server = app.listen(env.PORT, () => {
     logger.info(`${brand.fullName} API listening on port ${env.PORT} [${env.NODE_ENV}]`);

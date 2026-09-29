@@ -4,7 +4,7 @@ const env = require('../../config/env');
 const logger = require('../../utils/logger');
 const Challenge = require('../../models/OtpChallenge');
 const ApiError = require('../../utils/ApiError');
-const { sendMail } = require('../../config/mailer');
+const { sendMail, resolveProvider } = require('../../config/mailer');
 const normalize = (value, channel) => channel === 'email' ? value.trim().toLowerCase() : '+' + value.trim().replace(/^\+/, '');
 function assertProvider(provider, channel) {
   const allowed = channel === 'email' ? ['smtp', 'resend', 'brevo', 'mock'] : ['msg91', 'twilio', 'mock'];
@@ -24,7 +24,7 @@ async function twilio(endpoint, values) {
 }
 async function send(identifier, channel) {
   identifier = normalize(identifier, channel);
-  const provider = channel === 'email' ? env.EMAIL_OTP_PROVIDER : env.OTP_PROVIDER;
+  const provider = channel === 'email' ? resolveProvider() : env.OTP_PROVIDER;
   assertProvider(provider, channel);
   const code = String(crypto.randomInt(100000, 1000000));
   const codeHash = await bcrypt.hash(code, 10);

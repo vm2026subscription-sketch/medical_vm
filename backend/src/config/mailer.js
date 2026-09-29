@@ -97,7 +97,7 @@ async function sendViaBrevo({ to, subject, html, text }) {
     body: JSON.stringify({ sender: { name, email: address }, to: [{ email: to }], subject, htmlContent: html, textContent: text }),
   });
   if (!res.ok) throw new Error(`Brevo ${res.status}: ${(await res.text()).slice(0, 300)}`);
-  return true;
+  return (await res.json()).messageId || undefined;
 }
 
 /** Splits a "Display Name <addr@example.com>" string into its parts. */
@@ -106,26 +106,52 @@ function splitSender(value) {
   return match ? [match[1] || senderName(), match[2]] : [senderName(), value || env.SMTP_USER];
 }
 
+const READY = {
+  smtp: () => Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS),
+  resend: () => Boolean(env.RESEND_API_KEY),
+  brevo: () => Boolean(env.BREVO_API_KEY),
+  mock: () => true,
+};
+
+function providerReady(provider) {
+  return READY[provider] ? READY[provider]() : false;
+}
+
+/**
+ * resolveProvider — EMAIL_OTP_PROVIDER is only a preference. A deployment whose provider
+ * variable never reached the container (stale image, wrong service/env) must not silently
+ * fall back to an unverified sender, which lands in spam, so the provider is resolved from
+ * whichever credentials are actually present. Order favours authenticated HTTP APIs, since
+ * an authenticated domain is what gets mail into the inbox.
+ */
+function resolveProvider() {
+  const configured = env.EMAIL_OTP_PROVIDER;
+  if (configured && configured !== 'auto' && providerReady(configured)) return configured;
+  for (const candidate of ['brevo', 'resend', 'smtp']) {
+    if (providerReady(candidate)) return candidate;
+  }
+  return configured || 'mock';
+}
+
 async function sendMail({ to, subject, html, text }) {
-    const provider = env.EMAIL_OTP_PROVIDER;
+    const provider = resolveProvider();
     try {
       if (provider === 'resend' || provider === 'brevo') {
-        logger.info({ to, provider }, 'Sending email via HTTP mail API');
-        if (provider === 'resend') await sendViaResend({ to, subject, html, text });
-        else await sendViaBrevo({ to, subject, html, text });
-        logger.info({ to, provider }, 'Email sent successfully');
+        logger.info({ to, provider, from: provider === 'brevo' ? env.BREVO_FROM || env.SMTP_FROM : env.RESEND_FROM || env.SMTP_FROM }, 'Sending email via HTTP mail API');
+        const messageId = provider === 'resend' ? await sendViaResend({ to, subject, html, text }) : await sendViaBrevo({ to, subject, html, text });
+        logger.info({ to, provider, messageId }, 'Email sent successfully');
         return true;
       }
       const transport = await getMailTransporter();
-      logger.info({ to, host: env.SMTP_HOST, port: env.SMTP_PORT }, 'Sending email via SMTP');
-      await transport.sendMail({
+      logger.info({ to, provider, host: env.SMTP_HOST, port: env.SMTP_PORT, from: env.SMTP_FROM }, 'Sending email via SMTP');
+      const info = await transport.sendMail({
         from: env.SMTP_FROM || { name: brand.fullName, address: env.SMTP_USER },
         to,
         subject,
         html,
         text,
       });
-      logger.info({ to }, 'Email sent successfully');
+      logger.info({ to, provider, messageId: info && info.messageId }, 'Email sent successfully');
       return true;
     } catch (err) {
       // A cached IP can go stale, so drop the transporter and let the next call re-resolve.
@@ -135,4 +161,4 @@ async function sendMail({ to, subject, html, text }) {
     }
   }
 
-module.exports = { getMailTransporter, sendMail };
+module.exports = { getMailTransporter, sendMail, resolveProvider, providerReady };
