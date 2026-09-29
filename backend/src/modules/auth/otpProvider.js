@@ -5,6 +5,7 @@ const logger = require('../../utils/logger');
 const Challenge = require('../../models/OtpChallenge');
 const ApiError = require('../../utils/ApiError');
 const { sendMail, resolveProvider } = require('../../config/mailer');
+const brand = require('../../config/brand');
 const normalize = (value, channel) => channel === 'email' ? value.trim().toLowerCase() : '+' + value.trim().replace(/^\+/, '');
 function assertProvider(provider, channel) {
   const allowed = channel === 'email' ? ['smtp', 'resend', 'brevo', 'mock'] : ['msg91', 'twilio', 'mock'];
@@ -47,14 +48,14 @@ async function send(identifier, channel) {
     const delivered = await sendMail({
       to: email,
       subject: 'Your MedPath by Vidyarthi Mitra login code',
-      text: `Your MedPath by Vidyarthi Mitra verification code is ${code}. It expires in 5 minutes. Sign in at https://medical.vidyarthimitra.org.`,
+      text: `Your ${brand.fullName} verification code is ${code}. It expires in 5 minutes. Sign in at ${brand.siteUrl}.`,
       html: `
         <div style="font-family: sans-serif; max-width: 420px; margin: 0 auto;">
-          <div style="padding-bottom:16px;border-bottom:3px solid #f58232;"><strong style="font-size:26px;color:#25355b;">MedPath</strong><div style="font-size:12px;color:#58627b;">by <img src="https://medical.vidyarthimitra.org/brand/vidyarthi-mitra.png" alt="Vidyarthi Mitra" width="166" height="42" style="vertical-align:middle;background:#fff;" /></div></div>
+          <div style="padding-bottom:16px;border-bottom:3px solid #f58232;"><strong style="font-size:26px;color:#25355b;">${brand.name}</strong><div style="font-size:12px;color:#58627b;">by <img src="${brand.siteUrl}/brand/vidyarthi-mitra.png" alt="Vidyarthi Mitra" width="166" height="42" style="vertical-align:middle;background:#fff;" /></div></div>
           <h2 style="color:#25355b;">Your verification code</h2>
           <p style="font-size: 32px; font-weight: 700; letter-spacing: 6px;">${code}</p>
           <p style="color:#54697A; font-size: 13px;">This code expires in 5 minutes. If you didn't request this, you can ignore this email.</p>
-          <a href="https://medical.vidyarthimitra.org" style="font-size:12px;color:#25355b;">medical.vidyarthimitra.org</a>
+          <a href="${brand.siteUrl}" style="font-size:12px;color:#25355b;">${brand.siteUrl.replace(/^https?:\/\//, '')}</a>
         </div>
       `,
     });

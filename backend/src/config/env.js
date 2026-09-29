@@ -78,7 +78,9 @@ module.exports = {
   CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY || '',
   CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET || '',
 
-  CORS_ORIGINS: (process.env.CORS_ORIGINS || 'https://medical.vidyarthimitra.org,http://localhost:5173,http://localhost:3000,http://localhost:8080')
+  APP_URL: process.env.APP_URL || 'https://medical-vm.vercel.app',
+
+  CORS_ORIGINS: (process.env.CORS_ORIGINS || 'https://medical-vm.vercel.app,https://medical.vidyarthimitra.org,http://localhost:5173,http://localhost:3000,http://localhost:8080')
     .split(',').map((origin) => origin.trim()).filter(Boolean),
 
   SLOT_HOLD_MINUTES: parseInt(process.env.SLOT_HOLD_MINUTES || '5', 10),
