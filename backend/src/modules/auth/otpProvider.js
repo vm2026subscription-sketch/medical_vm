@@ -7,8 +7,9 @@ const ApiError = require('../../utils/ApiError');
 const { sendMail, resolveProvider } = require('../../config/mailer');
 const brand = require('../../config/brand');
 const normalize = (value, channel) => channel === 'email' ? value.trim().toLowerCase() : '+' + value.trim().replace(/^\+/, '');
+const EMAIL_PROVIDERS = ['smtp', 'brevo', 'resend'];
 function assertProvider(provider, channel) {
-  const allowed = channel === 'email' ? ['smtp', 'resend', 'brevo', 'mock'] : ['msg91', 'twilio', 'mock'];
+  const allowed = channel === 'email' ? [...EMAIL_PROVIDERS, 'mock'] : ['msg91', 'twilio', 'mock'];
   if (!allowed.includes(provider)) throw new ApiError(503, 'Login delivery is not configured. Contact support.');
   const keys = { smtp: ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'], resend: ['RESEND_API_KEY'], brevo: ['BREVO_API_KEY'], msg91: ['MSG91_AUTH_KEY', 'MSG91_TEMPLATE_ID'], twilio: ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_VERIFY_SID'], mock: [] }[provider];
   if (keys.some((key) => !env[key])) throw new ApiError(503, 'Login delivery is not configured. Contact support.');
@@ -43,11 +44,10 @@ async function send(identifier, channel) {
   const filter = { _id: record._id, version };
   try {
     let providerSid;
-    if (provider === 'smtp') {
-      const email = identifier;
-    const delivered = await sendMail({
-      to: email,
-      subject: 'Your MedPath by Vidyarthi Mitra login code',
+    if (EMAIL_PROVIDERS.includes(provider)) {
+      const delivered = await sendMail({
+      to: identifier,
+      subject: `Your ${brand.fullName} login code`,
       text: `Your ${brand.fullName} verification code is ${code}. It expires in 5 minutes. Sign in at ${brand.siteUrl}.`,
       html: `
         <div style="font-family: sans-serif; max-width: 420px; margin: 0 auto;">
