@@ -15,6 +15,7 @@
     "make-admin": "node src/scripts/makeAdmin.js",
     "prepare:imports": "node src/scripts/prepareImports.js",
     "prepare:production": "node src/scripts/prepareProduction.js",
+    "seed:plans": "node src/scripts/seedPlans.js",
     "test:integration": "node --test integration/*.integration.cjs"
   },
   "dependencies": {
