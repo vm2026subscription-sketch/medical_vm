@@ -10,7 +10,7 @@ The original company logo is stored locally in `frontend/public/brand/vidyarthi-
 
 Production builds read the public API URL from `frontend/.env.production`: `https://medical.vidyarthimitra.org/api/v1`. Hosting must serve the frontend on this domain and forward `/api/` to Express, preserving the path. Keep local development on the localhost API. A hosting environment variable can override Vite's file setting, so set `VITE_API_URL` to the same production URL in the hosting dashboard too. Include `https://medical.vidyarthimitra.org` in the deployed backend's `CORS_ORIGINS`.
 
-DNS and HTTPS must be configured at the domain/hosting provider; these code changes do not publish the site. Update enabled authentication/payment providers to the deployed domain, including the Razorpay webhook URL `https://medical.vidyarthimitra.org/api/v1/billing/webhook/razorpay`. Keep your verified SMTP sender address; only its display name should be `MedPath by Vidyarthi Mitra`. The sitemap covers the public entry pages; individual catalog pages remain discoverable through website links.
+DNS and HTTPS must be configured at the domain/hosting provider; these code changes do not publish the site. Update enabled authentication/payment providers to the deployed domain, including the Razorpay webhook URL `https://medicalvm-production.up.railway.app/api/v1/billing/webhook/razorpay`. The webhook must point at the API host, not the frontend, because a static frontend does not proxy `/api/`. Keep your verified SMTP sender address; only its display name should be `MedPath by Vidyarthi Mitra`. The sitemap covers the public entry pages; individual catalog pages remain discoverable through website links.
 
 ## Run locally
 

@@ -61,10 +61,10 @@ Create a Verify service, configure a **six-digit** code, enable the destination 
 3. In the Razorpay Dashboard, create a webhook for:
 
    ```text
-   https://medical.vidyarthimitra.org/api/v1/billing/webhook/razorpay
+   https://medicalvm-production.up.railway.app/api/v1/billing/webhook/razorpay
    ```
 
-   Use the same secret, enable `payment.captured` and `payment.failed`, and save it in the same Test/Live mode as your keys. `order.paid` is also supported but is optional. For staging use its own deployed HTTPS URL and Test-mode webhook. The URL must reach Express without an authentication page or proxy rewrite. See [Razorpay webhook setup](https://razorpay.com/docs/webhooks/) and [signature validation/testing](https://razorpay.com/docs/webhooks/validate-test/).
+   Use the same secret, enable `payment.captured` and `payment.failed`, and save it in the same Test/Live mode as your keys. `order.paid` is also supported but is optional. For staging use its own deployed HTTPS URL and Test-mode webhook. The URL must point at the **API host**, not the frontend: a static frontend does not proxy `/api/`, so a Vercel frontend URL silently returns 404 and every payment event is lost. See [Razorpay webhook setup](https://razorpay.com/docs/webhooks/) and [signature validation/testing](https://razorpay.com/docs/webhooks/validate-test/).
 4. Configure **automatic payment capture** in Razorpay. Premium and counselling bookings are activated only for captured payments, not merely authorized payments. See [capture settings](https://razorpay.com/docs/payments/payments/capture-settings/).
 5. In the MedPath admin panel, publish an active plan such as Season Pass with **price 99 (rupees)**, the intended validity in days and accurate feature descriptions. No plan is seeded automatically. A checkout with less than INR 1 payable is rejected; use admin grants for free premium access. Counselling also needs an active service, counsellor and future availability slots.
 6. Ensure MongoDB Atlas/a replica set is configured and run `npm run prepare:production` in the backend before deploying. Start the API and worker. The configured database was prepared during this code update; each separate staging/production database needs its own preparation.
