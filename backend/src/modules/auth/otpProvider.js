@@ -9,6 +9,11 @@ const brand = require('../../config/brand');
 const normalize = (value, channel) => channel === 'email' ? value.trim().toLowerCase() : '+' + value.trim().replace(/^\+/, '');
 const EMAIL_PROVIDERS = ['smtp', 'brevo', 'resend'];
 function assertProvider(provider, channel) {
+  // SMS is deliberately unavailable until a real SMS provider is configured.
+  // Never let the local mock provider reveal a phone OTP on a public site.
+  if (channel === 'sms' && provider === 'mock') {
+    throw new ApiError(503, 'Mobile OTP is not available yet. Please use email login.');
+  }
   const allowed = channel === 'email' ? [...EMAIL_PROVIDERS, 'mock'] : ['msg91', 'twilio', 'mock'];
   if (!allowed.includes(provider)) throw new ApiError(503, 'Login delivery is not configured. Contact support.');
   const keys = { smtp: ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'], resend: ['RESEND_API_KEY'], brevo: ['BREVO_API_KEY'], msg91: ['MSG91_AUTH_KEY', 'MSG91_TEMPLATE_ID'], twilio: ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_VERIFY_SID'], mock: [] }[provider];

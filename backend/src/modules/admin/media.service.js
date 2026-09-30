@@ -31,4 +31,29 @@ function uploadImageBuffer(buffer, folder = 'medpath/colleges') {
   });
 }
 
-module.exports = { uploadImageBuffer };
+function uploadAttachmentBuffer(buffer, filename) {
+  if (!env.CLOUDINARY_CLOUD_NAME || !env.CLOUDINARY_API_KEY || !env.CLOUDINARY_API_SECRET) {
+    throw ApiError.internal(
+      'Cloudinary is not configured — set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET in .env'
+    );
+  }
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: 'medpath/notification-attachments',
+        resource_type: 'raw',
+        use_filename: true,
+        unique_filename: true,
+        filename_override: filename,
+        timeout: 60000,
+      },
+      (err, result) => {
+        if (err) return reject(ApiError.internal('Attachment upload to Cloudinary failed', err.message));
+        resolve(result);
+      }
+    );
+    stream.end(buffer);
+  });
+}
+
+module.exports = { uploadImageBuffer, uploadAttachmentBuffer };

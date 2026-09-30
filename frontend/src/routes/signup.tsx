@@ -34,7 +34,7 @@ type Mode = "phone" | "email";
 
 function Signup() {
   const [step, setStep] = useState(0);
-  const [mode, setMode] = useState<Mode>("phone");
+  const [mode, setMode] = useState<Mode>("email");
   const [otpStage, setOtpStage] = useState<"idle" | "sent" | "verified">("idle");
   const [sending, setSending] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -78,9 +78,9 @@ function Signup() {
     }
     setSending(true);
     try {
-      const res = mode === "phone" ? await requestOtp(fullPhone) : await requestEmailOtp(email);
+      await (mode === "phone" ? requestOtp(fullPhone) : requestEmailOtp(email));
       setOtpStage("sent");
-      toast.success(res.devOnlyCode ? `OTP sent (dev code: ${res.devOnlyCode})` : "OTP sent");
+      toast.success("OTP sent");
     } catch (err) {
       toast.error(
         err instanceof ApiClientError ? err.message : "Could not send OTP. Is the API running?",
@@ -209,13 +209,13 @@ function Signup() {
               {otpStage === "idle" && (
                 <div className="mt-5 flex gap-1.5 rounded-[12px] bg-paper p-1">
                   <button
-                    onClick={() => switchMode("phone")}
+                    disabled
+                    title="Mobile OTP will be available after SMS setup"
                     className={cn(
-                      "flex flex-1 items-center justify-center gap-1.5 rounded-[10px] py-2 text-[13px] font-semibold transition-colors duration-[180ms]",
-                      mode === "phone" ? "bg-card text-teal-700 shadow-sh-1" : "text-muted",
+                      "flex flex-1 cursor-not-allowed items-center justify-center gap-1.5 rounded-[10px] py-2 text-[13px] font-semibold text-muted-2 opacity-60",
                     )}
                   >
-                    <Smartphone className="size-4" strokeWidth={1.6} /> Phone
+                    <Smartphone className="size-4" strokeWidth={1.6} /> Phone soon
                   </button>
                   <button
                     onClick={() => switchMode("email")}

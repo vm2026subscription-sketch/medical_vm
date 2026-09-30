@@ -70,6 +70,7 @@ export interface NotificationDocument {
   createdAt: string;
   isRead: boolean;
   type: string;
+  attachments?: { name: string; url: string; mime?: string; size?: number }[];
 }
 export interface DashboardDocument {
   nextDeadline: { title: string; date: string; sourceUrl?: string } | null;

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Bell, CalendarClock, Database, CheckCheck, Sparkles } from "lucide-react";
+import { Bell, CalendarClock, Database, CheckCheck, Download, Paperclip, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Btn, EmptyState, Num, Panel, Pill, Skeleton } from "@/components/kit";
 import { fetchNotifications, markAllNotificationsRead, markNotificationRead } from "@/lib/api";
@@ -38,6 +38,7 @@ interface NotificationItem {
   unread: boolean;
   premium: boolean;
   kind: string;
+  attachments: { name: string; url: string; mime?: string; size?: number }[];
 }
 
 function Notifications() {
@@ -139,41 +140,48 @@ function Notifications() {
           {items.map((n) => {
             const Icon = icons[n.kind] ?? Bell;
             return (
-              <button
+              <article
                 key={n.id}
-                onClick={async () => {
-                  try {
-                    await markNotificationRead(n.id);
-                    setItems((cur) =>
-                      cur.map((i) => (i.id === n.id ? { ...i, unread: false } : i)),
-                    );
-                  } catch {
-                    toast.error("Could not mark this notification read");
-                  }
-                }}
                 className={cn(
-                  "flex w-full items-start gap-3.5 p-4 text-left transition-colors duration-[180ms] hover:bg-paper",
+                  "transition-colors duration-[180ms] hover:bg-paper",
                   n.unread && "bg-teal-050/50",
                 )}
               >
-                <span
-                  className={cn(
-                    "flex size-9 shrink-0 items-center justify-center rounded-[12px]",
-                    n.premium ? "bg-gold-050 text-gold-600" : "bg-teal-050 text-teal-700",
-                  )}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await markNotificationRead(n.id);
+                      setItems((cur) => cur.map((i) => (i.id === n.id ? { ...i, unread: false } : i)));
+                    } catch {
+                      toast.error("Could not mark this notification read");
+                    }
+                  }}
+                  className="flex w-full items-start gap-3.5 p-4 text-left"
                 >
-                  <Icon className="size-[18px]" strokeWidth={1.6} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="text-[14.5px] font-semibold leading-snug">{n.title}</span>
-                    {n.premium && <Pill tone="gold">Premium alert</Pill>}
+                  <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-[12px]", n.premium ? "bg-gold-050 text-gold-600" : "bg-teal-050 text-teal-700")}>
+                    <Icon className="size-[18px]" strokeWidth={1.6} />
                   </span>
-                  <Num className="mt-1 block text-[11.5px] text-muted-2">{n.time}</Num>
-                  <span className="mt-1 block text-sm text-muted">{n.body}</span>
-                </span>
-                {n.unread && <span className="mt-2 size-2 shrink-0 rounded-full bg-rose" />}
-              </button>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="text-[14.5px] font-semibold leading-snug">{n.title}</span>
+                      {n.premium && <Pill tone="gold">Premium alert</Pill>}
+                    </span>
+                    <Num className="mt-1 block text-[11.5px] text-muted-2">{n.time}</Num>
+                    <span className="mt-1 block text-sm text-muted">{n.body}</span>
+                  </span>
+                  {n.unread && <span className="mt-2 size-2 shrink-0 rounded-full bg-rose" />}
+                </button>
+                {n.attachments.length > 0 && (
+                  <div className="ml-[58px] flex flex-wrap gap-2 px-4 pb-4">
+                    {n.attachments.map((file) => (
+                      <a key={file.url} href={file.url} target="_blank" rel="noreferrer" download={file.name} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-050">
+                        <Paperclip className="size-3.5" /> {file.name} <Download className="size-3.5" />
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </article>
             );
           })}
         </Panel>

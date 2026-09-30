@@ -27,5 +27,21 @@ const uploadImage = multer({
   },
 });
 
+const attachmentExtensions = new Set([
+  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.csv', '.zip', '.txt',
+]);
+const uploadAttachment = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 12 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const extension = file.originalname.slice(file.originalname.lastIndexOf('.')).toLowerCase();
+    if (!attachmentExtensions.has(extension)) {
+      return cb(ApiError.badRequest('Attachments must be PDF, DOCX, XLSX, CSV, ZIP or TXT files'));
+    }
+    cb(null, true);
+  },
+});
+
 module.exports = upload;
 module.exports.uploadImage = uploadImage;
+module.exports.uploadAttachment = uploadAttachment;

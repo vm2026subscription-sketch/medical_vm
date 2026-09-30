@@ -21,4 +21,9 @@ const listDownloads = catchAsync(async (req, res) => {
   res.status(200).json({ success: true, data });
 });
 
-module.exports = { listBlogs, getBlog, listFaqs, listDownloads };
+const getFooter = catchAsync(async (req, res) => {
+  const data = await service.getFooterSettings();
+  res.status(200).json({ success: true, data });
+});
+
+module.exports = { listBlogs, getBlog, listFaqs, listDownloads, getFooter };

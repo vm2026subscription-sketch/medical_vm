@@ -11,7 +11,9 @@ const Fee = require('../src/models/Fee');
 const Cutoff = require('../src/models/CutOff');
 const Counsellor = require('../src/models/Counsellor');
 const Slot = require('../src/models/AvailabilitySlot');
+const Setting = require('../src/models/Setting');
 const notifications = require('../src/modules/notifications/notifications.service');
+const content = require('../src/modules/content/content.service');
 const { generateSeatMatch } = require('../src/modules/predict/predict.service');
 const { listSlotsForDate } = require('../src/modules/counselling/counselling.service');
 const oid = () => new mongoose.Types.ObjectId();
@@ -25,11 +27,12 @@ after(async () => { await mongoose.disconnect(); if (server) await server.stop()
 
 test('broadcast reads are isolated by user; private and future notifications stay hidden', async () => {
   const alice = oid(), bob = oid();
-  const broadcast = await News.create({ title: 'Notice', body: 'Official details', isRead: true });
+  const broadcast = await News.create({ title: 'Notice', body: 'Official details', isRead: true, attachments: [{ name: 'Round schedule.pdf', url: 'https://files.example.test/round-schedule.pdf', mime: 'application/pdf', size: 1024 }] });
   const privateNotice = await News.create({ userId: bob, title: 'Private', body: 'For Bob' });
   const future = await News.create({ title: 'Scheduled', body: 'Later', scheduledFor: new Date(Date.now() + 86400000) });
   assert.equal((await notifications.listForUser(alice, {})).data.length, 1);
   assert.equal((await notifications.listForUser(alice, {})).data[0].isRead, false);
+  assert.equal((await notifications.listForUser(alice, {})).data[0].attachments[0].name, 'Round schedule.pdf');
   await notifications.markRead(alice, broadcast._id);
   assert.equal((await notifications.listForUser(alice, {})).data[0].isRead, true);
   const bobPage = await notifications.listForUser(bob, {});
@@ -41,6 +44,16 @@ test('broadcast reads are isolated by user; private and future notifications sta
   await News.updateOne({ _id: future._id }, { $set: { scheduledFor: new Date(Date.now() - 1) } });
   const scheduled = (await notifications.listForUser(bob, {})).data.find((row) => row._id.equals(future._id));
   assert.equal(scheduled.isRead, false);
+});
+
+test('public footer settings stay empty until an administrator saves contacts or links', async () => {
+  assert.deepEqual(await content.getFooterSettings(), { contacts: [], links: [] });
+  const value = {
+    contacts: [{ type: 'email', label: 'Admissions', value: 'contact@example.test' }],
+    links: [{ icon: 'instagram', label: 'Instagram', url: 'https://instagram.com/example' }],
+  };
+  await Setting.create({ key: 'footer_settings', value });
+  assert.deepEqual(await content.getFooterSettings(), value);
 });
 
 test('seat matches respect home-state quota, latest tuition budget, latest round and exclude NRI', async () => {

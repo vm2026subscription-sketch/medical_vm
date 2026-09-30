@@ -373,6 +373,7 @@ export async function fetchNotifications(page = 1) {
       id: n._id,
       title: n.title,
       body: n.body || "",
+      attachments: n.attachments || [],
       time: new Date(n.createdAt).toLocaleString("en-IN", {
         day: "2-digit",
         month: "short",

@@ -23,6 +23,9 @@ const Service = require('../../models/Service');
 const Plan = require('../../models/Plan');
 const AvailabilitySlot = require('../../models/AvailabilitySlot');
 const Counsellor = require('../../models/Counsellor');
+const NewsNotification = require('../../models/NewsNotification');
+const upload = require('../../middlewares/upload');
+const { uploadAttachmentBuffer } = require('./media.service');
 
 const router = express.Router();
 const id = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid record ID');
@@ -106,6 +109,56 @@ router.put('/deadline', requirePermission('colleges:write'), catchAsync(async (r
   await Setting.findOneAndUpdate({ key: 'counselling_deadline' }, { $set: { value: data } }, { upsert: true });
   await recordAudit({ adminUserId: req.user.id, action: 'update', entity: 'Setting', before: before?.value, after: data });
   res.json({ success: true, data });
+}));
+const footerContact = z.object({
+  type: z.enum(['phone', 'email', 'whatsapp', 'address']),
+  label: z.string().trim().min(1).max(80),
+  value: z.string().trim().min(1).max(300),
+  url: z.union([z.literal(''), z.string().url().regex(/^(https:|mailto:|tel:)/)]).optional(),
+}).strict();
+const footerLink = z.object({
+  icon: z.enum(['instagram', 'facebook', 'youtube', 'linkedin', 'x', 'website']),
+  label: z.string().trim().min(1).max(80),
+  url: z.string().url().regex(/^https:\/\//),
+}).strict();
+router.get('/footer', requirePermission('analytics:read'), catchAsync(async (_req, res) => {
+  const setting = await Setting.findOne({ key: 'footer_settings' }).lean();
+  res.json({ success: true, data: setting?.value || { contacts: [], links: [] } });
+}));
+router.put('/footer', requirePermission('analytics:read'), catchAsync(async (req, res) => {
+  const data = parse(z.object({ contacts: z.array(footerContact).max(8), links: z.array(footerLink).max(10) }).strict(), req.body);
+  const before = await Setting.findOne({ key: 'footer_settings' }).lean();
+  await Setting.findOneAndUpdate({ key: 'footer_settings' }, { $set: { value: data } }, { upsert: true });
+  await recordAudit({ adminUserId: req.user.id, action: 'update', entity: 'Setting', before: before?.value, after: data });
+  res.json({ success: true, data });
+}));
+router.post('/notifications/attachments', requirePermission('analytics:read'), upload.uploadAttachment.single('file'), catchAsync(async (req, res) => {
+  if (!req.file) throw ApiError.badRequest('Choose an attachment');
+  const result = await uploadAttachmentBuffer(req.file.buffer, req.file.originalname);
+  res.status(201).json({ success: true, data: {
+    name: req.file.originalname,
+    url: result.secure_url,
+    mime: req.file.mimetype || 'application/octet-stream',
+    size: req.file.size,
+  } });
+}));
+router.post('/notifications', requirePermission('analytics:read'), catchAsync(async (req, res) => {
+  const attachment = z.object({
+    name: z.string().trim().min(1).max(180),
+    url: z.string().url().regex(/^https:\/\//),
+    mime: z.string().max(120).optional(),
+    size: z.number().int().min(0).max(12 * 1024 * 1024).optional(),
+  }).strict();
+  const data = parse(z.object({
+    title: z.string().trim().min(1).max(180),
+    body: z.string().trim().min(1).max(4000),
+    type: z.enum(['deadline', 'premium_alert', 'general']).default('general'),
+    scheduledFor: z.coerce.date().optional(),
+    attachments: z.array(attachment).max(5).default([]),
+  }).strict(), req.body);
+  const record = await NewsNotification.create(data);
+  await recordAudit({ adminUserId: req.user.id, action: 'create', entity: 'NewsNotification', entityId: record._id, after: data });
+  res.status(201).json({ success: true, data: record });
 }));
 router.patch('/bookings/:id', requirePermission('counsellors:manage'), catchAsync(async (req, res) => {
   const recordId = parse(id, req.params.id);

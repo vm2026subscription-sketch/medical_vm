@@ -27,6 +27,8 @@ import { toast } from "sonner";
 import { AdminImportPanel } from "@/components/admin-import-center";
 import { AdminTeamSettings } from "@/components/admin-team-settings";
 import { AdminAccessSettings } from "@/components/admin-access-settings";
+import { AdminNotificationPublisher } from "@/components/admin-notification-publisher";
+import { AdminFooterSettings } from "@/components/admin-footer-settings";
 import { AdminResourcePanel } from "@/components/admin-resource-panel";
 import { useApp } from "@/lib/app-state";
 import {
@@ -156,6 +158,7 @@ function Admin() {
     ...(canImport && allowed(session, "imports:review")
       ? [{ key: "entry-review", label: "Review & publish" }]
       : []),
+    ...(allowed(session, "analytics:read") ? [{ key: "notifications", label: "Notifications" }] : []),
     ...visible.filter((r) => r.key !== "hostel-fees").map((r) => ({ key: r.key, label: r.label })),
     ...(allowed(session, "analytics:read") ? [{ key: "settings", label: "Site settings" }] : []),
   ];
@@ -241,6 +244,7 @@ function Admin() {
           {tab === "users" && session.role === "super_admin" && (
             <AdminAccessSettings onChanged={() => setUsersRevision((value) => value + 1)} />
           )}
+          {tab === "notifications" && allowed(session, "analytics:read") && <AdminNotificationPublisher />}
           {resource && (
             <AdminResourcePanel
               key={
@@ -313,6 +317,7 @@ function Admin() {
               {session.role === "super_admin" && <AdminAccessSettings />}
               {allowed(session, "roles:manage") && <AdminTeamSettings />}
               {allowed(session, "colleges:write") && <DeadlineEditor />}
+              <AdminFooterSettings />
             </>
           )}
         </div>

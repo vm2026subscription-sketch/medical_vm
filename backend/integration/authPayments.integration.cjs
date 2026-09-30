@@ -75,6 +75,18 @@ test('failed delivery and production mock mode never produce a usable OTP', asyn
   env.EMAIL_OTP_PROVIDER = 'mock';
   try { await assert.rejects(otp.sendEmailOtp('mock@example.com'), { statusCode: 503 }); } finally { env.EMAIL_OTP_PROVIDER = 'smtp'; }
 });
+test('phone OTP mock is disabled and never returns a development code', async () => {
+  const saved = env.OTP_PROVIDER;
+  env.OTP_PROVIDER = 'mock';
+  try {
+    await assert.rejects(
+      otp.sendOtp('+919876543210'),
+      (error) => error.statusCode === 503 && error.message === 'Mobile OTP is not available yet. Please use email login.',
+    );
+  } finally {
+    env.OTP_PROVIDER = saved;
+  }
+});
 test('Twilio Verify checks provider approval and MSG91 sends auth in headers with a timeout', async () => {
   Object.assign(env, { OTP_PROVIDER: 'twilio', TWILIO_ACCOUNT_SID: 'AC_test', TWILIO_AUTH_TOKEN: 'isolated', TWILIO_VERIFY_SID: 'VA_test' });
   global.fetch = async (url, init) => {

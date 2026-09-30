@@ -29,9 +29,9 @@ interface AppState {
   user: User | null;
   isAuthenticated: boolean;
   authLoading: boolean;
-  requestOtp: (phone: string) => Promise<{ sent: boolean; devOnlyCode?: string }>;
+  requestOtp: (phone: string) => Promise<{ sent: boolean }>;
   verifyOtp: (phone: string, code: string, name?: string) => Promise<void>;
-  requestEmailOtp: (email: string) => Promise<{ sent: boolean; devOnlyCode?: string }>;
+  requestEmailOtp: (email: string) => Promise<{ sent: boolean }>;
   verifyEmailOtp: (email: string, code: string, name?: string) => Promise<void>;
   logout: () => void;
 
@@ -145,7 +145,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, [saved, compare, rank]);
 
   const requestOtp = useCallback(async (phone: string) => {
-    const res = await apiRequest<{ data: { sent: boolean; devOnlyCode?: string } }>(
+    const res = await apiRequest<{ data: { sent: boolean } }>(
       "/auth/otp/request",
       {
         method: "POST",
@@ -174,7 +174,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   );
 
   const requestEmailOtp = useCallback(async (email: string) => {
-    const res = await apiRequest<{ data: { sent: boolean; devOnlyCode?: string } }>(
+    const res = await apiRequest<{ data: { sent: boolean } }>(
       "/auth/email-otp/request",
       {
         method: "POST",

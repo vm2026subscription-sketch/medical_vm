@@ -1,6 +1,7 @@
 const Blog = require('../../models/Blog');
 const Faq = require('../../models/Faq');
 const Download = require('../../models/Download');
+const Setting = require('../../models/Setting');
 const ApiError = require('../../utils/ApiError');
 const { parsePagination, paginatedResponse } = require('../../utils/pagination');
 
@@ -28,4 +29,9 @@ async function listPublicDownloads() {
   return Download.find({ userId: null }).sort({ createdAt: -1 }).lean();
 }
 
-module.exports = { listBlogs, getBlogBySlug, listFaqs, listPublicDownloads };
+async function getFooterSettings() {
+  const setting = await Setting.findOne({ key: 'footer_settings' }).lean();
+  return setting?.value || { contacts: [], links: [] };
+}
+
+module.exports = { listBlogs, getBlogBySlug, listFaqs, listPublicDownloads, getFooterSettings };
