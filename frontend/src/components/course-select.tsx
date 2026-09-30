@@ -1,5 +1,12 @@
 import type { Course } from "@/lib/catalog";
 
+const mainCourseOrder = ["MBBS", "BDS", "BAMS", "BHMS", "BPT", "BSCNURSING"];
+const normalizedCourse = (course: Course) => `${course.code} ${course.name}`.toUpperCase().replace(/[^A-Z]/g, "");
+const mainCourseIndex = (course: Course) => {
+  const value = normalizedCourse(course);
+  return mainCourseOrder.findIndex((courseCode) => value.includes(courseCode));
+};
+
 export function CourseSelect({
   courses,
   value,
@@ -11,7 +18,11 @@ export function CourseSelect({
   onChange: (value: string) => void;
   disabled?: boolean;
 }) {
-  const groups = [...new Set(courses.map((course) => course.discipline || "Other courses"))].sort();
+  const mainCourses = courses
+    .filter((course) => mainCourseIndex(course) >= 0)
+    .sort((a, b) => mainCourseIndex(a) - mainCourseIndex(b));
+  const remainingCourses = courses.filter((course) => mainCourseIndex(course) < 0);
+  const groups = [...new Set(remainingCourses.map((course) => course.discipline || "Other courses"))].sort();
   return (
     <label className="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted">
       Course
@@ -26,9 +37,18 @@ export function CourseSelect({
         {value && !courses.some((course) => course.slug === value) && (
           <option value={value}>{value}</option>
         )}
+        {mainCourses.length > 0 && (
+          <optgroup label="Main courses">
+            {mainCourses.map((course) => (
+              <option key={course.slug} value={course.slug}>
+                {course.code}
+              </option>
+            ))}
+          </optgroup>
+        )}
         {groups.map((group) => (
           <optgroup key={group} label={group}>
-            {courses
+            {remainingCourses
               .filter((course) => (course.discipline || "Other courses") === group)
               .map((course) => (
                 <option key={course.slug} value={course.slug}>
