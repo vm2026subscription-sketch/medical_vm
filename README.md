@@ -4,7 +4,7 @@ Medical college discovery and counselling platform with a React/TanStack Start f
 
 ## Brand and production domain
 
-The product is **MedPath**, with **by Vidyarthi Mitra** beneath the name. The production website is **https://medical.vidyarthimitra.org**. Shared brand settings live in `frontend/src/lib/brand.ts` and `backend/src/config/brand.js`. The header, footer, authentication screens, admin console, checkout and OTP emails use this identity; page titles, canonical URLs and social sharing metadata use the official domain.
+The product is **MedPath**, with **by Vidyarthi Mitra** beneath the name, the production website is **https://medical.vidyarthimitra.org**. Shared brand settings live in `frontend/src/lib/brand.ts` and `backend/src/config/brand.js`. The header, footer, authentication screens, admin console, checkout and OTP emails use this identity; page titles, canonical URLs and social sharing metadata use the official domain.
 
 The original company logo is stored locally in `frontend/public/brand/vidyarthi-mitra.png`, sourced from [Vidyarthi Mitra's official logo](https://www.vidyarthimitra.org/static/logo.png). The shared logo displays MedPath above a small "by" and this original company image, including on dark backgrounds where the image keeps a white backing. Checkout and OTP emails also use the company image. A reusable `medpath-logo.svg` embeds this same image. Run `npm run brand:assets` from the frontend to regenerate the wordmark and social preview (requires local Chrome on Windows or Playwright Chromium elsewhere). The user-provided `frontend/public/favicon.ico` is preserved.
 
