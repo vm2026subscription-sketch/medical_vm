@@ -128,6 +128,38 @@ export const CATALOG_CATEGORIES = [
   "VJA (W)",
 ];
 
+// State counselling category codes used by the cutoff and college filters.
+export const STATE_CATEGORIES: Record<string, string[]> = {
+  "Andhra Pradesh": ["OC", "EWS", "BC-A", "BC-B", "BC-C", "BC-D", "BC-E", "SC", "ST"],
+  "Arunachal Pradesh": ["APST", "UR/Open", "EWS"],
+  Assam: ["UR/Open", "EWS", "SC", "ST(P)", "ST(H)", "OBC", "MOBC"],
+  Bihar: ["UR", "EWS", "SC", "ST", "EBC", "BC"],
+  Chhattisgarh: ["UR", "EWS", "SC", "ST", "OBC"],
+  Goa: ["General/OPEN", "SC", "ST", "OBC", "EWS"],
+  Gujarat: ["OPEN/General", "EWS", "SC", "ST", "SEBC"],
+  Haryana: ["General", "EWS", "SC", "BC-A", "BC-B"],
+  "Himachal Pradesh": ["General", "EWS", "SC", "ST", "OBC"],
+  Jharkhand: ["UR", "EWS", "SC", "ST", "BC-I", "BC-II"],
+  Karnataka: ["GM", "EWS", "SC", "ST", "1", "2A", "2B", "3A", "3B"],
+  Kerala: ["SM", "EWS", "EZ", "MU", "BH", "LA", "DV", "VK", "KN", "BX", "KU", "SC", "ST"],
+  "Madhya Pradesh": ["UR", "EWS", "SC", "ST", "OBC"],
+  Maharashtra: ["OPEN", "EWS", "SC", "ST", "VJ/DT-A", "NT-B", "NT-C", "NT-D", "OBC", "SEBC"],
+  Manipur: ["UR", "EWS", "SC", "ST", "OBC"],
+  Meghalaya: ["Open/General", "ST", "SC", "EWS"],
+  Mizoram: ["Open/General", "ST", "SC", "EWS"],
+  Nagaland: ["Open/General", "ST", "EWS"],
+  Odisha: ["UR/General", "EWS", "SC", "ST", "SEBC"],
+  Punjab: ["General", "EWS", "SC", "BC"],
+  Rajasthan: ["GEN", "EWS", "SC", "ST", "OBC", "MBC"],
+  Sikkim: ["Open/General", "BL", "ST", "SC", "OBC/EBC", "EWS"],
+  "Tamil Nadu": ["OC", "BC", "BCM", "MBC/DNC", "SC", "SCA", "ST"],
+  Telangana: ["OC", "EWS", "BC-A", "BC-B", "BC-C", "BC-D", "BC-E", "SC", "ST"],
+  Tripura: ["UR", "EWS", "SC", "ST", "OBC"],
+  "Uttar Pradesh": ["General/UR", "EWS", "OBC", "SC", "ST"],
+  Uttarakhand: ["General", "EWS", "SC", "ST", "OBC"],
+  "West Bengal": ["UR", "EWS", "SC", "ST", "OBC-A", "OBC-B"],
+};
+
 export const QUOTAS = ["AIQ", "State", "Management", "Deemed", "NRI"];
 
 export const YEARS = Array.from(

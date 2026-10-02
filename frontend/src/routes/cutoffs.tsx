@@ -53,6 +53,7 @@ function CutoffPage() {
     "cutoffs",
     category === "All categories" ? undefined : category,
     retry,
+    state === "All states / UTs" ? undefined : state,
   );
   const [quota, setQuota] = useState("All quotas");
   const [year, setYear] = useState("All years");
@@ -160,7 +161,10 @@ function CutoffPage() {
             label="State / UT"
             options={["All states / UTs", ...STATES]}
             value={state}
-            onChange={(e) => changeFilter(setState, e.target.value)}
+            onChange={(e) => {
+              changeFilter(setState, e.target.value);
+              setCategory("All categories");
+            }}
           />
         </div>
         <p className="mt-3 text-xs text-muted">

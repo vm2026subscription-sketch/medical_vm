@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { apiRequest } from "./api-client";
-import { CATALOG_CATEGORIES } from "./catalog";
+import { CATALOG_CATEGORIES, STATE_CATEGORIES } from "./catalog";
 
 export function useCategoryOptions(
   scope: "admin" | "colleges" | "cutoffs",
   selected?: string,
   revision = 0,
+  state?: string,
 ) {
   const [published, setPublished] = useState<string[]>([]);
   useEffect(() => {
@@ -25,5 +26,6 @@ export function useCategoryOptions(
       current = false;
     };
   }, [scope, revision]);
+  if (state && STATE_CATEGORIES[state]) return STATE_CATEGORIES[state];
   return [...new Set([...CATALOG_CATEGORIES, ...published, ...(selected ? [selected] : [])])];
 }

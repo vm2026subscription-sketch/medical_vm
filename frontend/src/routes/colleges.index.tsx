@@ -52,7 +52,7 @@ function CollegeListing() {
   const { colleges, total, page, totalPages, courseOptions, apiDown, coursesDown } =
     Route.useLoaderData();
   const filters = Route.useSearch();
-  const categories = useCategoryOptions("colleges", filters.category);
+  const categories = useCategoryOptions("colleges", filters.category, 0, filters.state);
   const navigate = Route.useNavigate();
   const router = useRouter();
   const pending = useRouterState({ select: (state) => state.isLoading });
@@ -109,6 +109,7 @@ function CollegeListing() {
           onChange={(event) =>
             update({
               state: event.target.value === "All states / UTs" ? undefined : event.target.value,
+              category: undefined,
             })
           }
           disabled={pending}
