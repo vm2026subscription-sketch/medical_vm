@@ -49,15 +49,15 @@ function CutoffPage() {
   const [course, setCourse] = useState("All courses");
   const [category, setCategory] = useState("All categories");
   const [retry, setRetry] = useState(0);
+  const [quota, setQuota] = useState("All quotas");
+  const [year, setYear] = useState("All years");
+  const [state, setState] = useState("All states / UTs");
   const categories = useCategoryOptions(
     "cutoffs",
     category === "All categories" ? undefined : category,
     retry,
     state === "All states / UTs" ? undefined : state,
   );
-  const [quota, setQuota] = useState("All quotas");
-  const [year, setYear] = useState("All years");
-  const [state, setState] = useState("All states / UTs");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [error, setError] = useState(false);
