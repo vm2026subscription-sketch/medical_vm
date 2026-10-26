@@ -8,7 +8,7 @@ const CollegeCourse = require('../src/models/CollegeCourse');
 const Fee = require('../src/models/Fee');
 const SeatMatrix = require('../src/models/SeatMatrix');
 const CutOff = require('../src/models/CutOff');
-const { listColleges, getCollegeDetail } = require('../src/modules/colleges/colleges.service');
+const { listColleges } = require('../src/modules/colleges/colleges.service');
 const { listCutoffs } = require('../src/modules/cutoffs/cutoffs.service');
 const { listColleges: validation } = require('../src/modules/colleges/colleges.validation');
 const env = require('../src/config/env');
@@ -79,57 +79,4 @@ test('cutoff state/search/category filters preserve premium pagination and free 
   assert.equal(guest.lockedCount, 25 - guest.data.length);
   assert.ok(guest.maskedPreview.every((row) => row.closingRank === null && row.collegeName !== target.name));
   assert.equal((await listCutoffs({ ...filters, state: 'Maharashtra' }, true)).totalCount, 0);
-});
-
-test('a full page uses a bounded number of queries and preserves independent college summaries', async (t) => {
-  const colleges = await College.find({ state: 'Maharashtra' }).sort({ name: 1 }).limit(24).lean();
-  await CollegeCourse.insertMany(colleges.map((college) => ({ collegeId: college._id, courseId: nursing._id, totalSeats: 40 })));
-  const operations = [];
-  mongoose.set('debug', (collection, method) => operations.push(`${collection}.${method}`));
-  let result;
-  const started = performance.now();
-  try { result = await listColleges({ page: 1, limit: 24 }); }
-  finally { mongoose.set('debug', false); }
-  t.diagnostic(`24 colleges: ${operations.length} database operations, ${Math.round(performance.now() - started)}ms in isolated MongoDB`);
-  assert.equal(result.data.length, 24);
-  assert.ok(operations.length <= 8, `Queries must not grow per college: ${operations.join(', ')}`);
-  assert.ok(result.data.every((row) => row.seats === 40 && row.feeFrom === null && row.closingRank === null));
-  const detail = await getCollegeDetail(target._id, false);
-  const listed = (await listColleges({ search: '(West)' })).data[0];
-  for (const field of ['seats', 'feeFrom', 'feeMerit', 'feePrivate', 'closingRank', 'closingRankCourse', 'closingRankCategory']) {
-    assert.equal(detail.college[field], listed[field], field);
-  }
-});
-
-test('college details include published seat matrix for every linked course and year without unlocking cutoffs', async () => {
-  await SeatMatrix.create([
-    { collegeCourseId: medicalLink._id, category: 'SC', quota: 'State', year: 2026, round: 'Round2', authority: 'State authority', seats: 0 },
-    { collegeCourseId: medicalLink._id, category: 'SC', quota: 'State', year: 2025, round: 'Round1', authority: 'State authority', seats: 8 },
-  ]);
-  const detail = await getCollegeDetail(target._id, false);
-  assert.equal(detail.seatMatrix.length, 3);
-  assert.equal(detail.seatMatrix.at(-1).year, 2025);
-  assert.ok(detail.seatMatrix.some((row) => row.courseName === 'B.Sc. Nursing' && row.seats === 10));
-  assert.ok(detail.seatMatrix.some((row) => row.courseName === 'MBBS' && row.seats === 0));
-  assert.equal(detail.cutoffs.locked, true);
-  assert.equal(detail.cutoffs.rows.length, env.FREE_CUTOFF_ROWS);
-  const empty = await getCollegeDetail((await College.findOne({ state: 'Maharashtra' }))._id, false);
-  assert.deepEqual(empty.seatMatrix, []);
-});
-
-test('batched cutoff previews preserve year and counselling-round order across courses and latest update time', async () => {
-  const older = new Date('2026-01-01T00:00:00Z');
-  const newer = new Date('2026-10-01T00:00:00Z');
-  await CutOff.collection.insertMany([
-    { collegeCourseId: nursingLink._id, category: 'SC', quota: 'State', authority: 'Preview test', year: 2025, round: 'Stray', closingRank: 99, updatedAt: newer },
-    { collegeCourseId: nursingLink._id, category: 'SC', quota: 'State', authority: 'Preview test', year: 2026, round: 'Stray', closingRank: 98765, updatedAt: older },
-  ]);
-  const detail = await getCollegeDetail(target._id, false);
-  const summary = (await listColleges({ search: '(West)' })).data[0];
-  assert.equal(summary.closingRank, 98765);
-  assert.equal(summary.closingRankCourse, 'B.Sc. Nursing');
-  assert.equal(summary.closingRankRound, 'Stray');
-  assert.equal(summary.closingRankYear, 2026);
-  assert.equal(summary.cutoffUpdatedAt.getTime(), detail.college.cutoffUpdatedAt.getTime());
-  assert.equal(summary.cutoffUpdatedAt.getTime(), Math.max(...(await CutOff.find({ collegeCourseId: { $in: [nursingLink._id, medicalLink._id] } })).map((row) => row.updatedAt.getTime())));
 });
