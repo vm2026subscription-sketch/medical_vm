@@ -4,6 +4,7 @@ import type { ReactNode, InputHTMLAttributes, SelectHTMLAttributes } from "react
 import { cn } from "@/lib/utils";
 import type { Band, College } from "@/lib/catalog";
 import { inr, rank as fmtRank } from "@/lib/catalog";
+import { CollegeImage } from "@/components/college-gallery";
 
 /* ---------------- Button ---------------- */
 
@@ -338,17 +339,7 @@ export function CollegeCard({
     <div className="group flex flex-col overflow-hidden rounded-[16px] border border-line bg-card shadow-sh-1 transition-all duration-[180ms] hover:-translate-y-0.5 hover:shadow-sh-2">
       <div className="relative h-32 bg-gradient-to-br from-teal-100 to-teal-050">
         <div className="absolute inset-0 opacity-40 [background-image:radial-gradient(circle_at_20%_20%,#0a6e68_1px,transparent_1px)] [background-size:14px_14px]" />
-        {college.images?.[0] && (
-          <img
-            src={college.images[0]}
-            alt={`${college.name} campus`}
-            loading="lazy"
-            className="absolute inset-0 h-full w-full object-cover"
-            onError={(e) => {
-              e.currentTarget.style.display = "none";
-            }}
-          />
-        )}
+        <CollegeImage images={college.images || []} name={college.name} />
         <div className="absolute left-3 top-3 flex gap-1.5">
           <Pill
             tone={

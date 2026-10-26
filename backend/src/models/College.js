@@ -21,5 +21,6 @@ const collegeSchema = new mongoose.Schema(
 );
 
 collegeSchema.index({ name: 'text', city: 'text', state: 'text' });
+collegeSchema.index({ isActive: 1, name: 1, _id: 1 });
 
 module.exports = mongoose.model('College', collegeSchema);

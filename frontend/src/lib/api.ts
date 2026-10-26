@@ -152,6 +152,18 @@ export async function fetchColleges(
 export interface CollegeDetail {
   college: College;
   cutoffs: { locked: boolean; rows: CutoffRow[]; lockedCount: number };
+  seatMatrix: SeatMatrixRow[];
+}
+
+export interface SeatMatrixRow {
+  _id: string;
+  courseName: string;
+  authority: string;
+  category: string;
+  quota: string;
+  round: string;
+  year: number;
+  seats: number;
 }
 
 export async function fetchCollege(id: string): Promise<CollegeDetail> {
@@ -159,10 +171,12 @@ export async function fetchCollege(id: string): Promise<CollegeDetail> {
     data: {
       college: CollegeDocument;
       cutoffs: { locked: boolean; rows: CutoffDocument[]; lockedCount: number };
+      seatMatrix?: SeatMatrixRow[];
     };
   }>(`/colleges/${id}`, { auth: true });
   return {
     college: mapCollege(res.data.college),
+    seatMatrix: res.data.seatMatrix ?? [],
     cutoffs: {
       locked: res.data.cutoffs.locked,
       lockedCount: res.data.cutoffs.lockedCount,

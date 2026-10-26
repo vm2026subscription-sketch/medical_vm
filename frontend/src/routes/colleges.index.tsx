@@ -1,7 +1,17 @@
 import { createFileRoute, useRouter, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { BtnLink, Btn, CollegeCard, Dropdown, EmptyState, Num, SearchBar } from "@/components/kit";
+import {
+  BtnLink,
+  Btn,
+  CollegeCard,
+  Dropdown,
+  EmptyState,
+  Num,
+  SearchBar,
+  Skeleton,
+} from "@/components/kit";
 import { CourseSelect } from "@/components/course-select";
 import { QUOTAS, STATES } from "@/lib/catalog";
 import { useCategoryOptions } from "@/lib/category-options";
@@ -17,19 +27,34 @@ import { useApp } from "@/lib/app-state";
 export const Route = createFileRoute("/colleges/")({
   validateSearch: collegeSearch,
   loaderDeps: ({ search }) => search,
+  staleTime: 30_000,
+  preloadStaleTime: 30_000,
+  pendingMs: 100,
+  pendingMinMs: 0,
+  pendingComponent: () => (
+    <div
+      role="status"
+      aria-label="Loading colleges"
+      className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6 md:py-12"
+    >
+      <h1 className="text-[26px] md:text-[34px]">Colleges</h1>
+      <p className="mt-2 text-sm text-muted">Loading colleges…</p>
+      <Skeleton className="mt-5 h-44" />
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {[0, 1, 2, 3, 4, 5].map((index) => (
+          <Skeleton key={index} className="h-72" />
+        ))}
+      </div>
+    </div>
+  ),
   loader: async ({ deps }) => {
-    const [result, courses] = await Promise.allSettled([
-      fetchColleges(collegeQuery(deps)),
-      fetchCourses(),
-    ]);
+    const [result] = await Promise.allSettled([fetchColleges(collegeQuery(deps))]);
     return {
       colleges: result.status === "fulfilled" ? result.value.items : [],
       total: result.status === "fulfilled" ? result.value.total : 0,
       page: result.status === "fulfilled" ? result.value.page : deps.page || 1,
       totalPages: result.status === "fulfilled" ? result.value.totalPages : 1,
-      courseOptions: courses.status === "fulfilled" ? courses.value : [],
       apiDown: result.status === "rejected",
-      coursesDown: courses.status === "rejected",
     };
   },
   head: () => ({
@@ -49,8 +74,18 @@ const OWNERSHIPS = ["All ownership", "Government", "Private", "Deemed"];
 const ownershipValues = ["", "govt", "private", "deemed"];
 
 function CollegeListing() {
-  const { colleges, total, page, totalPages, courseOptions, apiDown, coursesDown } =
-    Route.useLoaderData();
+  const { colleges, total, page, totalPages, apiDown } = Route.useLoaderData();
+  const {
+    data: courseOptions = [],
+    isError: coursesDown,
+    isPending: coursesLoading,
+    refetch: reloadCourses,
+  } = useQuery({
+    queryKey: ["college-course-options"],
+    queryFn: fetchCourses,
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
   const filters = Route.useSearch();
   const categories = useCategoryOptions("colleges", filters.category, 0, filters.state);
   const navigate = Route.useNavigate();
@@ -100,7 +135,7 @@ function CollegeListing() {
           courses={courseOptions}
           value={filters.course || ""}
           onChange={(course) => update({ course: course || undefined })}
-          disabled={pending || coursesDown}
+          disabled={pending || coursesDown || coursesLoading}
         />
         <Dropdown
           label="State / UT"
@@ -165,7 +200,7 @@ function CollegeListing() {
       {coursesDown && (
         <div role="alert" className="mt-3 text-sm">
           The course list could not load.{" "}
-          <Btn variant="link" onClick={() => void router.invalidate()}>
+          <Btn variant="link" onClick={() => void reloadCourses()}>
             Retry
           </Btn>
         </div>

@@ -4,15 +4,23 @@ const { courses } = createRequire(import.meta.url)("../../backend/src/data/medic
   courses: { name: string; slug: string; discipline: string }[];
 };
 
-async function openColleges(page: Page) {
+async function openColleges(
+  page: Page,
+  gates: { colleges?: Promise<void>; courses?: Promise<void>; images?: string[] } = {},
+) {
   const calls: URL[] = [];
   await page.route("**/api/v1/**", async (route) => {
     const url = new URL(route.request().url());
     calls.push(url);
     let body: unknown = { data: [] };
-    if (url.pathname === "/api/v1/courses") body = { data: courses };
+    if (url.pathname === "/api/v1/content/footer") body = { data: { contacts: [], links: [] } };
+    if (url.pathname === "/api/v1/courses") {
+      await gates.courses;
+      body = { data: courses };
+    }
     if (url.pathname.endsWith("/categories")) body = { data: ["SOURCE-CUSTOM / W"] };
     if (url.pathname === "/api/v1/colleges") {
+      await gates.colleges;
       const currentPage = Number(url.searchParams.get("page") || 1);
       body = {
         data: [
@@ -23,6 +31,7 @@ async function openColleges(page: Page) {
             state: "Gujarat",
             ownership: "private",
             courses: ["B.Sc. Nursing", "GNM", "ANM", "B.Pharm"],
+            images: gates.images || [],
             seats: 60,
             feeMerit: null,
             feePrivate: null,
@@ -36,13 +45,179 @@ async function openColleges(page: Page) {
     await route.fulfill({ json: body });
   });
   await page.goto("/login");
-  await page.getByPlaceholder("98765 43210").fill("9876543210");
+  await page.getByPlaceholder("aarav@example.com").fill("student@example.com");
   await expect(page.getByRole("button", { name: "Send OTP", exact: true })).toBeEnabled();
   await page.getByRole("link", { name: "Back to browsing" }).click();
   await page.getByRole("link", { name: "Colleges", exact: true }).first().click();
   await expect(page.getByRole("heading", { name: "Colleges", exact: true })).toBeVisible();
   return calls;
 }
+
+test("Home to Colleges shows loading feedback and renders cards while courses are still pending", async ({
+  page,
+}) => {
+  let releaseColleges!: () => void;
+  let releaseCourses!: () => void;
+  const colleges = new Promise<void>((resolve) => {
+    releaseColleges = resolve;
+  });
+  const courseOptions = new Promise<void>((resolve) => {
+    releaseCourses = resolve;
+  });
+  try {
+    const opening = openColleges(page, { colleges, courses: courseOptions });
+    await expect(page.getByRole("status", { name: "Loading colleges" })).toBeVisible();
+    releaseColleges();
+    await opening;
+    await expect(
+      page.getByRole("link", { name: "Published nursing college, page 1", exact: true }),
+    ).toBeVisible();
+    const courseMenu = page.getByRole("combobox", { name: "Course", exact: true });
+    await expect(courseMenu).toBeDisabled();
+    releaseCourses();
+    await expect(courseMenu).toBeEnabled();
+  } finally {
+    releaseColleges();
+    releaseCourses();
+  }
+});
+
+async function openCollegeDetail(page: Page, images: string[] = []) {
+  await page.route("**/api/v1/colleges/000000000000000000000001", (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          college: {
+            _id: "000000000000000000000001",
+            name: "Published nursing college",
+            city: "Ahmedabad",
+            state: "Gujarat",
+            ownership: "private",
+            courses: ["B.Sc. Nursing"],
+            images,
+          },
+          cutoffs: { locked: true, rows: [], lockedCount: 10 },
+          seatMatrix: [
+            {
+              _id: "seat-new",
+              courseName: "B.Sc. Nursing",
+              authority: "State authority",
+              category: "OBC",
+              quota: "State",
+              round: "Round2",
+              year: 2026,
+              seats: 0,
+            },
+            {
+              _id: "seat-old",
+              courseName: "B.Sc. Nursing",
+              authority: "State authority",
+              category: "SC",
+              quota: "AIQ",
+              round: "Round1",
+              year: 2025,
+              seats: 8,
+            },
+          ],
+        },
+      },
+    }),
+  );
+  await page.getByRole("link", { name: "Published nursing college, page 1", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Published nursing college", exact: true }),
+  ).toBeVisible();
+}
+
+test("college gallery promotes a loaded photo while the first is slow and removes broken thumbnails", async ({
+  page,
+}) => {
+  await openColleges(page);
+  let releaseFirst!: () => void;
+  const first = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="teal"/></svg>';
+  await page.route("**/campus-test/*", async (route) => {
+    expect(route.request().headers()["referer"]).toBeUndefined();
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("slow.svg")) await first;
+    if (path.endsWith("broken.svg")) return route.fulfill({ status: 404, body: "missing" });
+    return route.fulfill({ contentType: "image/svg+xml", body: svg });
+  });
+  try {
+    await openCollegeDetail(page, [
+      "/campus-test/slow.svg",
+      "/campus-test/broken.svg",
+      "/campus-test/working.svg",
+      "/campus-test/other.svg",
+    ]);
+    const cover = page.getByRole("img", { name: "Published nursing college campus", exact: true });
+    await expect(cover).toHaveAttribute("src", /(?:working|other)\.svg$/);
+    await expect
+      .poll(() => cover.evaluate((img) => (img as HTMLImageElement).naturalWidth))
+      .toBeGreaterThan(0);
+    await expect(
+      page.getByRole("button", { name: "View campus photo 2", exact: true }),
+    ).toHaveCount(0);
+    await page.getByRole("button", { name: "View campus photo 4", exact: true }).click();
+    await expect(cover).toHaveAttribute("src", "/campus-test/other.svg");
+    releaseFirst();
+    await expect(cover).toHaveAttribute("src", "/campus-test/other.svg");
+  } finally {
+    releaseFirst();
+  }
+});
+
+test("college seat matrix displays latest published year, zero seats and historical rows", async ({
+  page,
+}) => {
+  await openColleges(page);
+  await openCollegeDetail(page);
+  const table = page.getByRole("table", { name: "College seat matrix" });
+  await expect(table.getByRole("row")).toHaveCount(2);
+  await expect(table).toContainText("B.Sc. Nursing");
+  await expect(table).toContainText("OBC");
+  await expect(table.getByRole("cell", { name: "0", exact: true })).toBeVisible();
+  await page.getByRole("combobox", { name: "Seat matrix year" }).selectOption("2025");
+  await expect(table).toContainText("SC");
+  await expect(table.getByRole("cell", { name: "8", exact: true })).toBeVisible();
+  await expect(page.getByText("10 more cutoff rows are locked", { exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
+test("college gallery shows an empty state when every uploaded URL fails", async ({ page }) => {
+  await openColleges(page);
+  await page.route("**/campus-test/*", (route) => route.fulfill({ status: 404, body: "missing" }));
+  await openCollegeDetail(page, ["/campus-test/one.svg", "/campus-test/two.svg"]);
+  await expect(page.getByText("Campus photos unavailable", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /View campus photo/ })).toHaveCount(0);
+});
+
+test("college cards try the next photo when the first URL fails and omit the referrer", async ({
+  page,
+}) => {
+  await page.route("**/campus-test/*", (route) => {
+    expect(route.request().headers()["referer"]).toBeUndefined();
+    return route.request().url().endsWith("broken.svg")
+      ? route.fulfill({ status: 404, body: "missing" })
+      : route.fulfill({
+          contentType: "image/svg+xml",
+          body: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"/>',
+        });
+  });
+  await openColleges(page, { images: ["/campus-test/broken.svg", "/campus-test/working.svg"] });
+  const image = page.getByRole("img", {
+    name: "Published nursing college, page 1 campus",
+    exact: true,
+  });
+  await expect(image).toHaveAttribute("src", "/campus-test/working.svg");
+  await expect
+    .poll(() => image.evaluate((img) => (img as HTMLImageElement).naturalWidth))
+    .toBeGreaterThan(0);
+});
 
 for (const [years, penalty, expectedYears, expectedPenalty] of [
   [null, null, "N/A", "N/A"],
@@ -160,7 +335,7 @@ test("all 50 courses and all states/UTs are available on mobile with the restore
   const course = page.getByRole("combobox", { name: "Course", exact: true });
   await expect(course).toBeVisible();
   await expect(course.locator("option")).toHaveCount(courses.length + 1);
-  await expect(course.locator("optgroup")).toHaveCount(9);
+  await expect(course.locator('optgroup[label="Main courses"]')).toHaveCount(1);
   const state = page.getByRole("combobox", { name: "State / UT", exact: true });
   await expect(state).toBeVisible();
   await expect(state.locator("option")).toHaveCount(37);
@@ -192,7 +367,7 @@ test("course, state, category, quota, fee and search reach the API; paging and b
   };
   await select("Course", "bsc-nursing");
   await select("State / UT", "Gujarat");
-  await select("Category", "OBC");
+  await select("Category", "SEBC");
   await select("Quota", "Management");
   await select("Annual tuition", "₹1–5 lakh");
   await page.getByRole("textbox", { name: "Search colleges" }).fill("Nursing West");
@@ -204,7 +379,7 @@ test("course, state, category, quota, fee and search reach the API; paging and b
   expect(Object.fromEntries(latest.searchParams)).toMatchObject({
     course: "bsc-nursing",
     state: "Gujarat",
-    category: "OBC",
+    category: "SEBC",
     quota: "Management",
     minFee: "100000",
     maxFee: "500000",
@@ -313,7 +488,7 @@ test("cutoff page provides premium pagination and state filtering, with recovera
   await expect(page.getByText("Cutoff college page 1", { exact: true })).toBeVisible();
   expect(calls.at(-1)!.searchParams.get("state")).toBe("Gujarat");
   fail = true;
-  await page.getByRole("combobox", { name: "Category", exact: true }).selectOption("OBC");
+  await page.getByRole("combobox", { name: "Category", exact: true }).selectOption("SEBC");
   await expect(page.getByRole("alert")).toContainText("Cutoffs could not load");
   fail = false;
   await page.getByRole("button", { name: "Retry cutoffs", exact: true }).click();

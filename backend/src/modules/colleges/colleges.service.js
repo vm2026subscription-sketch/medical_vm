@@ -63,40 +63,23 @@ async function listColleges(filters) {
     College.countDocuments(query),
   ]);
 
-  const withSummary = await Promise.all(data.map((college) => attachSummary(college, { courseId: linkQuery.courseId, matchedLinks, minFee: filters.minFee, maxFee: filters.maxFee })));
+  const withSummary = await attachSummaries(data, { courseId: linkQuery.courseId, matchedLinks, minFee: filters.minFee, maxFee: filters.maxFee });
 
   return paginatedResponse({ data: withSummary, total, page, limit });
 }
 
-/**
- * attachSummary — enriches a bare College doc with the fields the card/list UI needs
- * (courses offered, total seats, latest merit/private fee, latest hostel fee, bond terms,
- * and the best available closing rank) without requiring the caller to hit the full
- * detail endpoint. Kept as light aggregate queries since catalog size is small; move to a
- * precomputed/cached summary collection if this list grows into the tens of thousands.
- */
-async function attachSummary(college, { courseId, matchedLinks, minFee, maxFee } = {}) {
-  const links = await CollegeCourse.find({ collegeId: college._id }).populate('courseId').lean();
-  const selectedLinks = links.filter((link) => (!courseId || String(link.courseId?._id) === String(courseId)) && (!matchedLinks || matchedLinks.some((id) => String(id) === String(link._id))));
-  const collegeCourseIds = selectedLinks.map((l) => l._id);
+function selectLinks(links, { courseId, matchedLinks } = {}) {
+  const matched = matchedLinks && new Set(matchedLinks.map(String));
+  return links.filter((link) => (!courseId || String(link.courseId?._id) === String(courseId)) && (!matched || matched.has(String(link._id))));
+}
+
+function summarizeCollege(college, { links, latestFees, hostelFee, bond, bestCutoff, cutoffUpdatedAt }, { courseId, matchedLinks, minFee, maxFee } = {}) {
+  const selectedLinks = selectLinks(links, { courseId, matchedLinks });
   // A partial sum would look like a complete intake. Unknown links keep the total unknown.
   const totalSeats = selectedLinks.length && selectedLinks.every((link) => link.totalSeats != null)
     ? selectedLinks.reduce((sum, link) => sum + link.totalSeats, 0) : null;
   const courseCodes = links.map((l) => l.courseId?.name).filter(Boolean);
 
-  const [latestFees, hostelFee, bond, previewCutoffs, latestCutoff] = await Promise.all([
-    Fee.aggregate([
-      { $match: { collegeCourseId: { $in: collegeCourseIds } } },
-      { $sort: { year: -1, _id: -1 } },
-      { $group: { _id: { link: '$collegeCourseId', tier: '$tier' }, tuition: { $first: '$tuition' } } },
-    ]),
-    HostelFee.findOne({ collegeId: college._id }).sort({ year: -1 }).lean(),
-    BondDetail.findOne({ collegeCourseId: { $in: collegeCourseIds } }).lean(),
-    // One public preview row; the full cutoff table retains entitlement checks.
-    CutOff.aggregate([{ $match: { collegeCourseId: { $in: collegeCourseIds } } }, ...cutoffOrder(), { $limit: 1 }]),
-    CutOff.findOne({ collegeCourseId: { $in: collegeCourseIds } }).sort({ updatedAt: -1 }).select('updatedAt').lean(),
-  ]);
-  const bestCutoff = previewCutoffs[0];
   const minimumFee = (fees) => {
     const amounts = fees.map((fee) => fee.tuition).filter((amount) => typeof amount === 'number' && Number.isFinite(amount));
     return amounts.length ? Math.min(...amounts) : null;
@@ -114,7 +97,7 @@ async function attachSummary(college, { courseId, matchedLinks, minFee, maxFee }
     bondPenalty: bond?.penaltyAmount ?? null,
     hostelFeePublished: hostelFee?.amount != null,
     bondPublished: bond?.years != null || bond?.penaltyAmount != null,
-    cutoffUpdatedAt: latestCutoff?.updatedAt || null,
+    cutoffUpdatedAt: cutoffUpdatedAt || null,
     closingRankYear: bestCutoff?.year || null,
     closingRankRound: bestCutoff?.round || null,
     closingRankCategory: bestCutoff?.category || null,
@@ -124,6 +107,65 @@ async function attachSummary(college, { courseId, matchedLinks, minFee, maxFee }
   };
 }
 
+// Fetch summaries for the entire page in a fixed number of queries, rather than
+// opening seven queries per college and queuing them behind the connection pool.
+async function attachSummaries(colleges, options = {}) {
+  if (!colleges.length) return [];
+  const collegeIds = colleges.map((college) => college._id);
+  const links = await CollegeCourse.find({ collegeId: { $in: collegeIds } }).populate('courseId', 'name').lean();
+  const selectedLinks = selectLinks(links, options);
+  const collegeCourseIds = selectedLinks.map((link) => link._id);
+  const [latestFees, hostelFees, bonds, previews] = await Promise.all([
+    Fee.aggregate([
+      { $match: { collegeCourseId: { $in: collegeCourseIds } } },
+      { $sort: { year: -1, _id: -1 } },
+      { $group: { _id: { link: '$collegeCourseId', tier: '$tier' }, tuition: { $first: '$tuition' } } },
+    ]),
+    HostelFee.find({ collegeId: { $in: collegeIds } }).sort({ year: -1 }).lean(),
+    BondDetail.find({ collegeCourseId: { $in: collegeCourseIds } }).lean(),
+    CutOff.aggregate([
+      { $match: { collegeCourseId: { $in: collegeCourseIds } } },
+      ...cutoffOrder(),
+      { $group: { _id: '$collegeCourseId', row: { $first: '$$ROOT' }, updatedAt: { $max: '$updatedAt' } } },
+      // Reapply the same ordering across course previews before selecting a college's first row.
+      { $replaceRoot: { newRoot: { $mergeObjects: ['$row', { cutoffUpdatedAt: '$updatedAt' }] } } },
+      ...cutoffOrder(),
+    ]),
+  ]);
+  const groupBy = (rows, key) => {
+    const grouped = new Map();
+    for (const row of rows) {
+      const id = String(key(row));
+      if (!grouped.has(id)) grouped.set(id, []);
+      grouped.get(id).push(row);
+    }
+    return grouped;
+  };
+  const collegeByLink = new Map(links.map((link) => [String(link._id), link.collegeId]));
+  const linksByCollege = groupBy(links, (row) => row.collegeId);
+  const feesByCollege = groupBy(latestFees, (row) => collegeByLink.get(String(row._id.link)));
+  const hostelsByCollege = groupBy(hostelFees, (row) => row.collegeId);
+  const bondsByCollege = groupBy(bonds, (row) => collegeByLink.get(String(row.collegeCourseId)));
+  const previewsByCollege = groupBy(previews, (row) => collegeByLink.get(String(row.collegeCourseId)));
+
+  return colleges.map((college) => {
+    const id = String(college._id);
+    const cutoffs = previewsByCollege.get(id) || [];
+    return summarizeCollege(college, {
+      links: linksByCollege.get(id) || [],
+      latestFees: feesByCollege.get(id) || [],
+      hostelFee: hostelsByCollege.get(id)?.[0],
+      bond: bondsByCollege.get(id)?.[0],
+      bestCutoff: cutoffs[0],
+      cutoffUpdatedAt: cutoffs.reduce((latest, row) => row.cutoffUpdatedAt > latest ? row.cutoffUpdatedAt : latest, null),
+    }, options);
+  });
+}
+
+async function attachSummary(college, options) {
+  return (await attachSummaries([college], options))[0];
+}
+
 async function getCollegeDetail(collegeId, isPremium) {
   const college = await College.findById(collegeId).lean();
   if (!college || !college.isActive) throw ApiError.notFound('College not found');
@@ -131,13 +173,20 @@ async function getCollegeDetail(collegeId, isPremium) {
   const collegeCourses = await CollegeCourse.find({ collegeId }).populate('courseId').lean();
   const collegeCourseIds = collegeCourses.map((cc) => cc._id);
 
-  const [fees, hostelFees, bonds, cutoffs] = await Promise.all([
-    Fee.find({ collegeCourseId: { $in: collegeCourseIds } }).sort({ year: -1 }).lean(),
+  const [fees, hostelFees, bonds, cutoffs, seatMatrix] = await Promise.all([
+    Fee.find({ collegeCourseId: { $in: collegeCourseIds } }).sort({ year: -1, _id: -1 }).lean(),
     HostelFee.find({ collegeId }).sort({ year: -1 }).lean(),
     BondDetail.find({ collegeCourseId: { $in: collegeCourseIds } }).lean(),
     CutOff.aggregate([{ $match: { collegeCourseId: { $in: collegeCourseIds } } }, ...cutoffOrder()]),
+    SeatMatrix.find({ collegeCourseId: { $in: collegeCourseIds } }).sort({ year: -1, authority: 1, round: 1, category: 1, quota: 1, _id: 1 }).lean(),
   ]);
-  for (const cutoff of cutoffs) cutoff.courseName = collegeCourses.find((link) => String(link._id) === String(cutoff.collegeCourseId))?.courseId?.name || '';
+  const courseNames = new Map(collegeCourses.map((link) => [String(link._id), link.courseId?.name || '']));
+  for (const row of [...cutoffs, ...seatMatrix]) row.courseName = courseNames.get(String(row.collegeCourseId)) || '';
+  const latestFees = new Map();
+  for (const fee of fees) {
+    const key = `${fee.collegeCourseId}:${fee.tier}`;
+    if (!latestFees.has(key)) latestFees.set(key, { _id: { link: fee.collegeCourseId, tier: fee.tier }, tuition: fee.tuition });
+  }
 
   // Entitlement gating: free users see only the most recent year's cutoffs, capped in count.
   let cutoffPayload;
@@ -153,11 +202,19 @@ async function getCollegeDetail(collegeId, isPremium) {
   }
 
   return {
-    college: await attachSummary(college),
+    college: summarizeCollege(college, {
+      links: collegeCourses,
+      latestFees: [...latestFees.values()],
+      hostelFee: hostelFees[0],
+      bond: bonds[0],
+      bestCutoff: cutoffs[0],
+      cutoffUpdatedAt: cutoffs.reduce((latest, row) => row.updatedAt > latest ? row.updatedAt : latest, null),
+    }),
     courses: collegeCourses,
     fees,
     hostelFees,
     bonds,
+    seatMatrix,
     cutoffs: cutoffPayload,
   };
 }

@@ -4,8 +4,9 @@ import { Heart, GitCompare, MapPin, ShieldCheck, TrendingUp } from "lucide-react
 import { toast } from "sonner";
 import { Btn, LockOverlay, Num, Panel, Pill } from "@/components/kit";
 import { ApiUnreachable } from "@/components/api-unreachable";
+import { CollegeGallery } from "@/components/college-gallery";
 import { inr, rank as fmtRank, type CutoffRow } from "@/lib/catalog";
-import { fetchCollege, toggleSaveCollege, type CollegeDetail } from "@/lib/api";
+import { fetchCollege, toggleSaveCollege, type CollegeDetail, type SeatMatrixRow } from "@/lib/api";
 import { ApiClientError } from "@/lib/api-client";
 import { useApp } from "@/lib/app-state";
 import { cn } from "@/lib/utils";
@@ -59,19 +60,20 @@ function CollegeDetails() {
 
 function CollegeContent({ initial }: { initial: CollegeDetail }) {
   const [detail, setDetail] = useState(initial);
-  const { college, cutoffs } = detail;
+  const { college, cutoffs, seatMatrix } = detail;
   const { saved, toggleSaved, compare, toggleCompare, premium, user, authLoading } = useApp();
   const [tab, setTab] = useState<(typeof TABS)[number]>("Overview");
-  const [cover, setCover] = useState(0);
   useEffect(() => {
     let current = true;
     if (!authLoading) {
       setDetail(initial);
-      fetchCollege(initial.college.id)
-        .then((data) => {
-          if (current) setDetail(data);
-        })
-        .catch(() => {});
+      // SSR cannot read the browser token; only a signed-in session needs this refresh.
+      if (user)
+        fetchCollege(initial.college.id)
+          .then((data) => {
+            if (current) setDetail(data);
+          })
+          .catch(() => {});
     }
     return () => {
       current = false;
@@ -86,41 +88,7 @@ function CollegeContent({ initial }: { initial: CollegeDetail }) {
     <div className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6 md:py-12">
       {/* Header */}
       <Panel className="overflow-hidden">
-        <div className="h-48 bg-gradient-to-br from-teal-700 to-ink-3 md:h-80">
-          {college.images?.[cover] && (
-            <img
-              src={college.images[cover]}
-              alt={`${college.name} campus`}
-              className="h-full w-full object-cover"
-              onError={(e) => {
-                e.currentTarget.style.visibility = "hidden";
-              }}
-            />
-          )}
-        </div>
-        {(college.images?.length || 0) > 1 && (
-          <div className="flex gap-2 overflow-x-auto p-3">
-            {college.images!.map((url, index) => (
-              <button
-                key={url}
-                aria-label={`View campus photo ${index + 1}`}
-                aria-pressed={cover === index}
-                onClick={() => setCover(index)}
-                className={cn(
-                  "shrink-0 overflow-hidden rounded-lg border-2",
-                  cover === index ? "border-teal-600" : "border-transparent",
-                )}
-              >
-                <img
-                  src={url}
-                  alt={`Campus photo ${index + 1}`}
-                  loading="lazy"
-                  className="h-14 w-20 object-cover"
-                />
-              </button>
-            ))}
-          </div>
-        )}
+        <CollegeGallery key={college.id} images={college.images || []} name={college.name} />
         <div className="p-5 md:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -227,9 +195,18 @@ function CollegeContent({ initial }: { initial: CollegeDetail }) {
           and rounds are listed below.
         </p>
       )}
-      <div className="mt-5 grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+      <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         {/* Cutoffs */}
-        <div className="grid gap-5">
+        <div className="grid min-w-0 grid-cols-1 gap-5">
+          <Panel className="p-5">
+            <h2 className="text-[19px]">Seat matrix</h2>
+            <p className="mt-1 text-[13px] text-muted">
+              Published seats by course, category, quota, counselling round and year.
+            </p>
+            <div className="mt-4 overflow-x-auto">
+              <SeatMatrixTable rows={seatMatrix} />
+            </div>
+          </Panel>
           <Panel className="p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-[19px]">Category & year-wise cutoffs</h2>
@@ -315,7 +292,7 @@ function CollegeContent({ initial }: { initial: CollegeDetail }) {
         </div>
 
         {/* Fees & bond */}
-        <div className="grid gap-5">
+        <div className="grid min-w-0 grid-cols-1 gap-5">
           <Panel className="p-5">
             <h2 className="text-[19px]">Fees & bond</h2>
             <dl className="mt-4 grid gap-2.5">
@@ -380,6 +357,77 @@ function CollegeContent({ initial }: { initial: CollegeDetail }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function SeatMatrixTable({ rows }: { rows: SeatMatrixRow[] }) {
+  const [year, setYear] = useState("");
+  const years = [...new Set(rows.map((row) => row.year))].sort((a, b) => b - a);
+  const selectedYear = years.some((value) => String(value) === year)
+    ? year
+    : String(years[0] || "");
+  const visible = rows.filter((row) => String(row.year) === selectedYear);
+  if (!rows.length) {
+    return (
+      <p className="py-6 text-center text-[13px] text-muted-2">
+        No seat matrix published yet for this college.
+      </p>
+    );
+  }
+  return (
+    <>
+      <label className="mb-3 flex items-center gap-2 text-sm">
+        Seat matrix year
+        <select
+          className="rounded-lg border border-line bg-card px-3 py-2"
+          value={selectedYear}
+          onChange={(event) => setYear(event.target.value)}
+        >
+          {years.map((value) => (
+            <option key={value} value={value}>
+              {value}
+            </option>
+          ))}
+        </select>
+      </label>
+      <table
+        aria-label="College seat matrix"
+        className="w-full min-w-[600px] border-collapse text-left"
+      >
+        <thead>
+          <tr className="border-b border-line text-[11px] uppercase tracking-wider text-muted-2">
+            {["Course / authority", "Category", "Quota", "Round", "Year", "Seats"].map(
+              (heading) => (
+                <th key={heading} scope="col" className="py-2.5 pr-3 font-semibold">
+                  {heading}
+                </th>
+              ),
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {visible.map((row) => (
+            <tr key={row._id} className="border-b border-line-2 text-[13px] last:border-0">
+              <td className="py-3 pr-3 font-medium">
+                {row.courseName}
+                <p className="text-xs font-normal text-muted">{row.authority}</p>
+              </td>
+              <td className="py-3 pr-3">{row.category}</td>
+              <td className="py-3 pr-3">
+                <Pill tone={row.quota === "AIQ" ? "sky" : "gray"}>{row.quota}</Pill>
+              </td>
+              <td className="py-3 pr-3">{row.round}</td>
+              <td className="py-3 pr-3">
+                <Num>{row.year}</Num>
+              </td>
+              <td className="py-3 pr-3">
+                <Num className="font-semibold">{row.seats}</Num>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
   );
 }
 
