@@ -11,6 +11,7 @@ export function AdminNotificationPublisher() {
   const [body, setBody] = useState("");
   const [type, setType] = useState("general");
   const [scheduledFor, setScheduledFor] = useState("");
+  const [emailEnabled, setEmailEnabled] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -51,6 +52,7 @@ export function AdminNotificationPublisher() {
           body,
           type,
           attachments,
+          emailEnabled,
           ...(scheduledFor ? { scheduledFor: new Date(scheduledFor).toISOString() } : {}),
         },
       });
@@ -58,6 +60,7 @@ export function AdminNotificationPublisher() {
       setBody("");
       setType("general");
       setScheduledFor("");
+      setEmailEnabled(false);
       setAttachments([]);
       toast.success(scheduledFor ? "Notification scheduled" : "Notification published");
     } catch (error) {
@@ -111,6 +114,10 @@ export function AdminNotificationPublisher() {
             <TextInput type="datetime-local" value={scheduledFor} onChange={(event) => setScheduledFor(event.target.value)} />
           </label>
         </div>
+        <label className="flex items-start gap-3 rounded-xl border border-line bg-paper p-3 text-sm">
+          <input type="checkbox" checked={emailEnabled} onChange={(event) => setEmailEnabled(event.target.checked)} className="mt-0.5 size-4" />
+          <span><span className="font-semibold">Email eligible students</span><span className="mt-0.5 block text-xs text-muted">Uses your configured production email provider. The notification always appears in the app.</span></span>
+        </label>
         <div>
           <p className="text-sm font-medium">Attachments (optional)</p>
           <p className="mt-1 text-xs text-muted">PDF, DOCX, XLSX, CSV, ZIP or TXT. Maximum 5 files, 12 MB each.</p>

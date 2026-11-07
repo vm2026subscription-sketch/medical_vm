@@ -26,6 +26,9 @@ const Counsellor = require('../../models/Counsellor');
 const NewsNotification = require('../../models/NewsNotification');
 const upload = require('../../middlewares/upload');
 const { uploadAttachmentBuffer } = require('./media.service');
+const { scheduleNotification } = require('../../jobs/queues');
+const { resolveProvider } = require('../../config/mailer');
+const catalogExport = require('./catalogExport.service');
 
 const router = express.Router();
 const id = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid record ID');
@@ -51,11 +54,24 @@ function parse(schema, input) {
 }
 
 router.get('/session', (req, res) => res.json({ success: true, data: { role: req.adminRole.name, permissions: req.adminRole.permissions } }));
+router.get('/catalog/:entity/export.xlsx', catchAsync(async (req, res) => {
+  const entity = req.params.entity;
+  const definition = catalogExport.catalog[entity];
+  if (!definition) throw ApiError.notFound('Unknown catalog data type');
+  if (req.adminRole.name !== 'super_admin' && !req.adminRole.permissions.includes(definition.permission)) {
+    throw ApiError.forbidden(`Missing permission: ${definition.permission}`);
+  }
+  const workbook = await catalogExport.createWorkbook(entity);
+  res.status(200)
+    .type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    .attachment(`medpath-${entity}-${new Date().toISOString().slice(0, 10)}.xlsx`)
+    .send(Buffer.from(workbook));
+}));
 router.get('/setup', requirePermission('analytics:read'), (req, res) => {
   res.json({ success: true, data: {
     environment: env.NODE_ENV,
     cloudinary: Boolean(env.CLOUDINARY_CLOUD_NAME && env.CLOUDINARY_API_KEY && env.CLOUDINARY_API_SECRET),
-    email: env.EMAIL_OTP_PROVIDER === 'smtp' && Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS && env.SMTP_FROM),
+    email: resolveProvider() !== 'mock',
     sms: env.OTP_PROVIDER === 'msg91' && Boolean(env.MSG91_AUTH_KEY && env.MSG91_TEMPLATE_ID),
     payments: Boolean(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET && env.RAZORPAY_WEBHOOK_SECRET),
   } });
@@ -154,9 +170,17 @@ router.post('/notifications', requirePermission('analytics:read'), catchAsync(as
     body: z.string().trim().min(1).max(4000),
     type: z.enum(['deadline', 'premium_alert', 'general']).default('general'),
     scheduledFor: z.coerce.date().optional(),
+    emailEnabled: z.boolean().default(false),
     attachments: z.array(attachment).max(5).default([]),
   }).strict(), req.body);
+  if (data.emailEnabled && resolveProvider() === 'mock') {
+    throw ApiError.badRequest('Email notifications need a configured SMTP, Resend or Brevo provider. Publish in-app only, or configure email first.');
+  }
   const record = await NewsNotification.create(data);
+  if (record.emailEnabled) {
+    const delay = record.scheduledFor ? Math.max(0, record.scheduledFor.getTime() - Date.now()) : 0;
+    await scheduleNotification({ kind: 'email-broadcast', notificationId: record._id.toString() }, delay);
+  }
   await recordAudit({ adminUserId: req.user.id, action: 'create', entity: 'NewsNotification', entityId: record._id, after: data });
   res.status(201).json({ success: true, data: record });
 }));

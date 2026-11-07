@@ -10,6 +10,7 @@ const newsNotificationSchema = new mongoose.Schema(
     targetState: { type: String },
     targetCourse: { type: String },
     scheduledFor: { type: Date },
+    emailEnabled: { type: Boolean, default: false },
     attachments: [{
       name: { type: String, required: true, trim: true, maxlength: 180 },
       url: { type: String, required: true },

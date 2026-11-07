@@ -6,7 +6,9 @@ import { BRAND } from "./brand";
 
 const PUBLIC_API_URL =
   (typeof import.meta !== "undefined" && import.meta.env["VITE_API_URL"]) ||
-  (import.meta.env.PROD ? `${BRAND.siteUrl}/api/v1` : "http://localhost:5000/api/v1");
+  (import.meta.env.PROD
+    ? "https://medicalvm-production.up.railway.app/api/v1"
+    : "http://localhost:5000/api/v1");
 const API_URL = import.meta.env.SSR
   ? process.env["INTERNAL_API_URL"] || PUBLIC_API_URL
   : PUBLIC_API_URL;

@@ -12,8 +12,12 @@ const Cutoff = require('../src/models/CutOff');
 const Counsellor = require('../src/models/Counsellor');
 const Slot = require('../src/models/AvailabilitySlot');
 const Setting = require('../src/models/Setting');
+const User = require('../src/models/User');
+const NotificationEmailDelivery = require('../src/models/NotificationEmailDelivery');
+const env = require('../src/config/env');
 const notifications = require('../src/modules/notifications/notifications.service');
 const content = require('../src/modules/content/content.service');
+const { deliverNotificationEmailBatch } = require('../src/modules/notifications/notificationEmail.service');
 const { generateSeatMatch } = require('../src/modules/predict/predict.service');
 const { listSlotsForDate } = require('../src/modules/counselling/counselling.service');
 const oid = () => new mongoose.Types.ObjectId();
@@ -54,6 +58,32 @@ test('public footer settings stay empty until an administrator saves contacts or
   };
   await Setting.create({ key: 'footer_settings', value });
   assert.deepEqual(await content.getFooterSettings(), value);
+});
+
+test('email-enabled notifications deliver once per active student with an email', async () => {
+  const mailer = require('../src/config/mailer');
+  const sent = [];
+  const original = mailer.sendMail;
+  const previous = { provider: env.EMAIL_OTP_PROVIDER, host: env.SMTP_HOST, user: env.SMTP_USER, pass: env.SMTP_PASS };
+  Object.assign(env, { EMAIL_OTP_PROVIDER: 'smtp', SMTP_HOST: 'test.invalid', SMTP_USER: 'test', SMTP_PASS: 'test' });
+  mailer.sendMail = async (input) => { sent.push(input); return true; };
+  try {
+    const [active, inactive] = await User.create([
+      { name: 'Active', email: 'notice-active@example.test', role: 'student', isActive: true },
+      { name: 'Inactive', email: 'notice-inactive@example.test', role: 'student', isActive: false },
+    ]);
+    const notice = await News.create({ title: 'Round update', body: 'Check the new schedule.', emailEnabled: true });
+    assert.deepEqual(await deliverNotificationEmailBatch({ notificationId: notice._id }), { sent: 1, queued: false });
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].to, active.email);
+    assert.equal(await NotificationEmailDelivery.countDocuments({ notificationId: notice._id, userId: active._id, status: 'sent' }), 1);
+    await deliverNotificationEmailBatch({ notificationId: notice._id });
+    assert.equal(sent.length, 1);
+    assert.equal(await NotificationEmailDelivery.countDocuments({ notificationId: notice._id, userId: inactive._id }), 0);
+  } finally {
+    mailer.sendMail = original;
+    Object.assign(env, { EMAIL_OTP_PROVIDER: previous.provider, SMTP_HOST: previous.host, SMTP_USER: previous.user, SMTP_PASS: previous.pass });
+  }
 });
 
 test('seat matches respect home-state quota, latest tuition budget, latest round and exclude NRI', async () => {

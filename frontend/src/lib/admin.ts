@@ -1,4 +1,4 @@
-import { apiRequest } from "./api-client";
+import { API_URL, apiRequest, getAccessToken } from "./api-client";
 import { unavailableNumberFields } from "./admin-entry";
 
 const examples: Record<string, Record<string, string>> = {
@@ -27,6 +27,27 @@ const examples: Record<string, Record<string, string>> = {
   slots: { counsellorId: "Copy the actual ID from Counsellors" },
 };
 export const exampleFor = (resource: string, key: string) => examples[resource]?.[key] || "";
+
+export async function downloadCatalogExcel(entity: string, label: string) {
+  const token = getAccessToken();
+  const response = await fetch(`${API_URL}/admin/catalog/${encodeURIComponent(entity)}/export.xlsx`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Could not create Excel download");
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `medpath-${entity}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  anchor.setAttribute("aria-label", `Download ${label} Excel`);
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
 
 export const attentionFilters = {
   photos: {

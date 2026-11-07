@@ -16,6 +16,7 @@ import {
   type Resource,
   exampleFor,
   attentionFilters,
+  downloadCatalogExcel,
   type AttentionFilter,
   type MissingDataEntry,
 } from "@/lib/admin";
@@ -52,6 +53,7 @@ export function AdminResourcePanel({
   const [editing, setEditing] = useState<AdminRecord | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [deleting, setDeleting] = useState<string[] | null>(null);
+  const [downloading, setDownloading] = useState(false);
   const reviewedCatalog = [
     "colleges",
     "courses",
@@ -144,6 +146,26 @@ export function AdminResourcePanel({
         >
           <Download className="size-4" /> Export this page
         </Btn>
+        {reviewedCatalog && (
+          <Btn
+            variant="ghost"
+            size="sm"
+            disabled={loading || downloading}
+            onClick={async () => {
+              setDownloading(true);
+              try {
+                await downloadCatalogExcel(resource.key, resource.label);
+                toast.success("Excel download started");
+              } catch (error) {
+                setError(error instanceof Error ? error.message : "Could not create Excel download");
+              } finally {
+                setDownloading(false);
+              }
+            }}
+          >
+            <Download className="size-4" /> {downloading ? "Preparing Excel…" : "Download all Excel"}
+          </Btn>
+        )}
         {canWrite && resource.createPath && (
           <Btn size="sm" onClick={() => setEditing({ _id: "" })}>
             <Plus className="size-4" /> Add {resource.key === "colleges" ? "college" : "record"}

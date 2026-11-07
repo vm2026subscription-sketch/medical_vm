@@ -3,7 +3,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY . .
-ARG VITE_API_URL=https://medical.vidyarthimitra.org/api/v1
+ARG VITE_API_URL=https://medicalvm-production.up.railway.app/api/v1
 ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 

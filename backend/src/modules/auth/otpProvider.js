@@ -9,8 +9,14 @@ const brand = require('../../config/brand');
 const normalize = (value, channel) => channel === 'email' ? value.trim().toLowerCase() : '+' + value.trim().replace(/^\+/, '');
 const EMAIL_PROVIDERS = ['smtp', 'brevo', 'resend'];
 function assertProvider(provider, channel) {
-  // SMS is deliberately unavailable until a real SMS provider is configured.
-  // Never let the local mock provider reveal a phone OTP on a public site.
+  // Mock codes are only for isolated local development. A public deployment must never
+  // return an OTP in its API response when a delivery provider is missing.
+  if (provider === 'mock' && env.NODE_ENV === 'production') {
+    throw new ApiError(503, channel === 'sms'
+      ? 'Mobile OTP is not available yet. Please use email login.'
+      : 'Email OTP delivery is not configured. Please contact support.');
+  }
+  // SMS remains unavailable until a real provider is deliberately configured, even locally.
   if (channel === 'sms' && provider === 'mock') {
     throw new ApiError(503, 'Mobile OTP is not available yet. Please use email login.');
   }

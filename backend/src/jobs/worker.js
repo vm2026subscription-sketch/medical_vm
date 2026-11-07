@@ -47,7 +47,10 @@ async function start() {
   const notificationWorker = new Worker(
     'notifications',
     async (job) => {
-      // TODO: wire up actual push/SMS/email delivery. For now, persist as an in-app notification.
+      if (job.data.kind === 'email-broadcast') {
+        return require('../modules/notifications/notificationEmail.service').deliverNotificationEmailBatch(job.data);
+      }
+      // Backward-compatible support for any older in-app notification queue jobs.
       const NewsNotification = require('../models/NewsNotification');
       await NewsNotification.create(job.data);
     },

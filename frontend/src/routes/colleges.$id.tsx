@@ -1,9 +1,10 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Heart, GitCompare, MapPin, ShieldCheck, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { Btn, LockOverlay, Num, Panel, Pill } from "@/components/kit";
 import { ApiUnreachable } from "@/components/api-unreachable";
+import { CollegeGallery } from "@/components/college-gallery";
 import { inr, rank as fmtRank, type CutoffRow } from "@/lib/catalog";
 import { fetchCollege, toggleSaveCollege, type CollegeDetail } from "@/lib/api";
 import { ApiClientError } from "@/lib/api-client";
@@ -58,25 +59,9 @@ function CollegeDetails() {
 }
 
 function CollegeContent({ initial }: { initial: CollegeDetail }) {
-  const [detail, setDetail] = useState(initial);
-  const { college, cutoffs } = detail;
-  const { saved, toggleSaved, compare, toggleCompare, premium, user, authLoading } = useApp();
+  const { college, cutoffs } = initial;
+  const { saved, toggleSaved, compare, toggleCompare, premium } = useApp();
   const [tab, setTab] = useState<(typeof TABS)[number]>("Overview");
-  const [cover, setCover] = useState(0);
-  useEffect(() => {
-    let current = true;
-    if (!authLoading) {
-      setDetail(initial);
-      fetchCollege(initial.college.id)
-        .then((data) => {
-          if (current) setDetail(data);
-        })
-        .catch(() => {});
-    }
-    return () => {
-      current = false;
-    };
-  }, [initial, user?.id, premium, authLoading]);
 
   const free = cutoffs.rows;
   const lockedCount = cutoffs.lockedCount;
@@ -86,41 +71,7 @@ function CollegeContent({ initial }: { initial: CollegeDetail }) {
     <div className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6 md:py-12">
       {/* Header */}
       <Panel className="overflow-hidden">
-        <div className="h-48 bg-gradient-to-br from-teal-700 to-ink-3 md:h-80">
-          {college.images?.[cover] && (
-            <img
-              src={college.images[cover]}
-              alt={`${college.name} campus`}
-              className="h-full w-full object-cover"
-              onError={(e) => {
-                e.currentTarget.style.visibility = "hidden";
-              }}
-            />
-          )}
-        </div>
-        {(college.images?.length || 0) > 1 && (
-          <div className="flex gap-2 overflow-x-auto p-3">
-            {college.images!.map((url, index) => (
-              <button
-                key={url}
-                aria-label={`View campus photo ${index + 1}`}
-                aria-pressed={cover === index}
-                onClick={() => setCover(index)}
-                className={cn(
-                  "shrink-0 overflow-hidden rounded-lg border-2",
-                  cover === index ? "border-teal-600" : "border-transparent",
-                )}
-              >
-                <img
-                  src={url}
-                  alt={`Campus photo ${index + 1}`}
-                  loading="lazy"
-                  className="h-14 w-20 object-cover"
-                />
-              </button>
-            ))}
-          </div>
-        )}
+        <CollegeGallery images={college.images || []} name={college.name} />
         <div className="p-5 md:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>

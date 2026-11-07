@@ -24,7 +24,13 @@ async function scheduleSlotRelease(slotId, delayMs) {
 }
 
 async function scheduleNotification(payload, delayMs = 0) {
-  await getQueues().notificationQueue.add('send', payload, { delay: delayMs, removeOnComplete: true });
+  await getQueues().notificationQueue.add('send', payload, {
+    delay: Math.max(0, delayMs),
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 5000 },
+    removeOnComplete: true,
+    removeOnFail: 100,
+  });
 }
 
 /**

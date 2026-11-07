@@ -29,6 +29,7 @@ import { AdminTeamSettings } from "@/components/admin-team-settings";
 import { AdminAccessSettings } from "@/components/admin-access-settings";
 import { AdminNotificationPublisher } from "@/components/admin-notification-publisher";
 import { AdminFooterSettings } from "@/components/admin-footer-settings";
+import { AdminDataLibrary } from "@/components/admin-data-library";
 import { AdminResourcePanel } from "@/components/admin-resource-panel";
 import { useApp } from "@/lib/app-state";
 import {
@@ -158,6 +159,9 @@ function Admin() {
     ...(canImport && allowed(session, "imports:review")
       ? [{ key: "entry-review", label: "Review & publish" }]
       : []),
+    ...(visible.some((resource) => ["colleges", "courses", "college-courses", "cutoffs", "fees", "hostel-fees", "bonds", "seat-matrix"].includes(resource.key))
+      ? [{ key: "data-library", label: "Data library" }]
+      : []),
     ...(allowed(session, "analytics:read") ? [{ key: "notifications", label: "Notifications" }] : []),
     ...visible.filter((r) => r.key !== "hostel-fees").map((r) => ({ key: r.key, label: r.label })),
     ...(allowed(session, "analytics:read") ? [{ key: "settings", label: "Site settings" }] : []),
@@ -245,6 +249,18 @@ function Admin() {
             <AdminAccessSettings onChanged={() => setUsersRevision((value) => value + 1)} />
           )}
           {tab === "notifications" && allowed(session, "analytics:read") && <AdminNotificationPublisher />}
+          {tab === "data-library" && (
+            <AdminDataLibrary
+              resources={visible}
+              session={session}
+              onDraft={(id) => {
+                setMissingEntry(undefined);
+                setAttention(undefined);
+                setDraftId(id);
+                setTab("import");
+              }}
+            />
+          )}
           {resource && (
             <AdminResourcePanel
               key={

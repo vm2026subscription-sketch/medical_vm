@@ -6,10 +6,13 @@ const College = require('../src/models/College');
 const Course = require('../src/models/Course');
 const CollegeCourse = require('../src/models/CollegeCourse');
 const Fee = require('../src/models/Fee');
+const HostelFee = require('../src/models/HostelFee');
 const SeatMatrix = require('../src/models/SeatMatrix');
 const CutOff = require('../src/models/CutOff');
 const { listColleges } = require('../src/modules/colleges/colleges.service');
 const { listCutoffs } = require('../src/modules/cutoffs/cutoffs.service');
+const { createWorkbook } = require('../src/modules/admin/catalogExport.service');
+const ExcelJS = require('exceljs');
 const { listColleges: validation } = require('../src/modules/colleges/colleges.validation');
 const env = require('../src/config/env');
 let server, target, nursing, medicine, nursingLink, medicalLink;
@@ -65,6 +68,23 @@ test('state aliases find existing imported spellings', async () => {
   assert.equal((await listColleges({ state: 'Delhi' })).pagination.total, 1);
   assert.equal((await listColleges({ state: 'delhi' })).pagination.total, 1);
 });
+
+test('a full college page uses a bounded number of database operations', async () => {
+  const colleges = await College.find({ state: 'Maharashtra' }).sort({ name: 1 }).limit(24).lean();
+  await CollegeCourse.insertMany(colleges.map((college) => ({ collegeId: college._id, courseId: nursing._id, totalSeats: 40 })));
+  const operations = [];
+  mongoose.set('debug', (collection, method) => operations.push(`${collection}.${method}`));
+  let result;
+  try {
+    result = await listColleges({ page: 1, limit: 24 });
+  } finally {
+    mongoose.set('debug', false);
+  }
+  assert.equal(result.data.length, 24);
+  assert.ok(operations.length <= 8, `Queries must not grow per college: ${operations.join(', ')}`);
+  assert.ok(result.data.every((row) => row.seats === 40 && row.feeFrom === null && row.closingRank === null));
+});
+
 test('cutoff state/search/category filters preserve premium pagination and free masking', async () => {
   const filters = { course: 'mbbs', category: 'OBC', quota: 'State', state: 'Gujarat', search: '(West)', year: 2026, limit: 20 };
   const first = await listCutoffs({ ...filters, page: 1 }, true);
@@ -79,4 +99,14 @@ test('cutoff state/search/category filters preserve premium pagination and free 
   assert.equal(guest.lockedCount, 25 - guest.data.length);
   assert.ok(guest.maskedPreview.every((row) => row.closingRank === null && row.collegeName !== target.name));
   assert.equal((await listCutoffs({ ...filters, state: 'Maharashtra' }, true)).totalCount, 0);
+});
+
+test('catalog Excel exports use reusable import columns and stable college/course references', async () => {
+  await HostelFee.create({ collegeId: target._id, year: 2026, amount: 85000 });
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(await createWorkbook('fees'));
+  const sheet = workbook.worksheets[0];
+  const rows = sheet.getRows(1, sheet.rowCount).map((row) => row.values.slice(1));
+  assert.deepEqual(rows[0], ['collegeCode', 'courseSlug', 'year', 'tier', 'tuition', 'otherCharges', 'hostelMess', 'sourceTag']);
+  assert.ok(rows.some((row) => row[0] === 'TEST-TARGET' && row[1] === 'bsc-nursing' && row[2] === 2026 && row[6] === 85000));
 });

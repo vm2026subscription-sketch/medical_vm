@@ -72,8 +72,10 @@ test('failed delivery and production mock mode never produce a usable OTP', asyn
   deliveryWorks = false;
   try { await assert.rejects(otp.sendEmailOtp('failed@example.com'), { statusCode: 503 }); } finally { deliveryWorks = true; }
   await assert.rejects(otp.verifyEmailOtp('failed@example.com', code()), { statusCode: 400 });
-  env.EMAIL_OTP_PROVIDER = 'mock';
-  try { await assert.rejects(otp.sendEmailOtp('mock@example.com'), { statusCode: 503 }); } finally { env.EMAIL_OTP_PROVIDER = 'smtp'; }
+  const saved = { provider: env.EMAIL_OTP_PROVIDER, host: env.SMTP_HOST, user: env.SMTP_USER, pass: env.SMTP_PASS };
+  Object.assign(env, { EMAIL_OTP_PROVIDER: 'mock', SMTP_HOST: '', SMTP_USER: '', SMTP_PASS: '' });
+  try { await assert.rejects(otp.sendEmailOtp('mock@example.com'), { statusCode: 503 }); }
+  finally { Object.assign(env, { EMAIL_OTP_PROVIDER: saved.provider, SMTP_HOST: saved.host, SMTP_USER: saved.user, SMTP_PASS: saved.pass }); }
 });
 test('phone OTP mock is disabled and never returns a development code', async () => {
   const saved = env.OTP_PROVIDER;

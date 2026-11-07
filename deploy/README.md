@@ -27,7 +27,7 @@ Preparation creates collections and declared indexes, including per-user notific
 
 Compose starts Redis with a persistent volume. API and web ports bind to `127.0.0.1` only; Nginx exposes them through HTTPS. The worker is a separate service so scheduled jobs continue after requests finish. The SSR frontend uses `INTERNAL_API_URL=http://api:5000/api/v1`, while browser requests use the official domain.
 
-The frontend public API URL is compiled during the build. If changing hosts, update the build argument `VITE_API_URL` and rebuild; a runtime-only change does not update browser JavaScript.
+The frontend public API URL is compiled during the build. The current production source of truth is `https://medicalvm-production.up.railway.app/api/v1`; keep it identical in `frontend/.env.production`, the frontend Docker build argument, and the hosting dashboard's `VITE_API_URL`. If changing hosts, update all three and rebuild; a runtime-only change does not update browser JavaScript.
 
 ## 3. HTTPS and reverse proxy
 
